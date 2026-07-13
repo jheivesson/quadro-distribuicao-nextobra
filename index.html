@@ -1169,13 +1169,17 @@ checkAuth();
 // cosφ é valor típico assumido por categoria de equipamento (não é valor normativo) —
 // sempre ajustável pelo usuário e sinalizado como estimativa no formulário/relatório.
 const CATEGORIAS_AMBIENTE = {
-  essenciais: 'Essenciais / iluminação / segurança',
-  cozinha: 'Cozinha',
-  lavanderia: 'Lavanderia',
-  banho: 'Aquecimento e banho',
-  climatizacao: 'Climatização e ventilação',
-  externa: 'Área externa e lazer',
-  ev: 'Recarga veicular residencial',
+  'r-sala': 'Sala de Estar / Jantar',
+  'r-quarto': 'Quarto / Suíte',
+  'r-banheiro': 'Banheiro / Lavabo',
+  'r-cozinha': 'Cozinha',
+  'r-lavanderia': 'Área de Serviço / Lavanderia',
+  'r-externa': 'Área Externa / Varanda / Jardim',
+  'r-garagem': 'Garagem',
+  'r-lazer': 'Piscina, Área Gourmet, Adega e Home Theater',
+  'r-climatizacao': 'Climatização e ventilação',
+  'r-seguranca': 'Essenciais, segurança e acesso',
+  'r-ev': 'Recarga veicular residencial',
   automacao: 'Automação (Casa Inteligente)',
   'com-gerais': 'Circuitos comerciais gerais',
   'com-climatizacao': 'Climatização',
@@ -1186,7 +1190,10 @@ const CATEGORIAS_AMBIENTE = {
   'com-especiais': 'Cargas comerciais especiais',
   'com-ev': 'Recarga veicular comercial',
   'cond-seguranca': 'Segurança e acesso',
+  'cond-garagem': 'Garagem / Estacionamento comum',
+  'cond-pilotis': 'Pilotis / Área comum coberta',
   'cond-lazer': 'Áreas de lazer e convivência',
+  'cond-servicos': 'Lavanderia coletiva e serviços',
   'cond-elevadores': 'Elevadores e bombeamento',
   'cond-ev': 'Recarga veicular (áreas comuns)',
   outros: 'Outros',
@@ -1198,62 +1205,80 @@ function perfilAtual() {
 }
 
 const AMBIENTES_RESIDENCIAL = [
-  // Essenciais / iluminação / segurança
-  { id: 'sala', nome: 'Sala de Estar / Jantar', categoria: 'essenciais', tipo: 'forca', dr: false, pot: 1200, cosPhi: 1 },
-  { id: 'quarto', nome: 'Quarto / Suíte', categoria: 'essenciais', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
-  { id: 'banheiro', nome: 'Banheiro / Lavabo', categoria: 'essenciais', tipo: 'forca', dr: true, pot: 1500, cosPhi: 1 },
-  { id: 'externa', nome: 'Área Externa / Varanda / Jardim', categoria: 'essenciais', tipo: 'forca', dr: true, pot: 1500, cosPhi: 1 },
-  { id: 'garagem', nome: 'Garagem', categoria: 'essenciais', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
-  { id: 'iluminacao-geral', nome: 'Iluminação Geral', categoria: 'essenciais', tipo: 'iluminacao', dr: false, pot: 600, cosPhi: 0.95 },
-  { id: 'iluminacao-emergencia', nome: 'Iluminação de Emergência', categoria: 'essenciais', tipo: 'iluminacao', dr: false, pot: 60, cosPhi: 0.95, seguranca: true },
-  { id: 'reserva-tecnica', nome: 'Reserva Técnica (circuito futuro)', categoria: 'essenciais', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
-  { id: 'campainha-interfone', nome: 'Campainha / Interfone / Porteiro Eletrônico', categoria: 'essenciais', tipo: 'forca', dr: false, pot: 100, cosPhi: 0.9 },
-  { id: 'cftv', nome: 'CFTV', categoria: 'essenciais', tipo: 'forca', dr: false, pot: 150, cosPhi: 0.9 },
-  { id: 'alarme', nome: 'Sistema de Alarme', categoria: 'essenciais', tipo: 'forca', dr: false, pot: 100, cosPhi: 0.9 },
-  { id: 'cerca-eletrica', nome: 'Cerca Elétrica', categoria: 'essenciais', tipo: 'forca', dr: true, pot: 150, cosPhi: 0.9 },
-  { id: 'portao-automatico', nome: 'Portão Automático', categoria: 'essenciais', tipo: 'forca', dr: true, pot: 500, cosPhi: 0.8 },
-  { id: 'fechadura-eletrica', nome: 'Fechadura Elétrica', categoria: 'essenciais', tipo: 'forca', dr: false, pot: 60, cosPhi: 0.9 },
+  // Sala de Estar / Jantar — iluminação e tomadas são circuitos independentes (NBR 5410, 9.5)
+  { id: 'sala-iluminacao', nome: 'Sala — Iluminação', categoria: 'r-sala', tipo: 'iluminacao', dr: false, pot: 400, cosPhi: 0.95 },
+  { id: 'sala', nome: 'Sala — Tomadas de Uso Geral', categoria: 'r-sala', tipo: 'forca', dr: true, pot: 1200, cosPhi: 1 },
 
-  // Cozinha
-  { id: 'cozinha', nome: 'Cozinha — Tomadas Gerais', categoria: 'cozinha', tipo: 'forca', dr: true, pot: 3500, cosPhi: 1 },
-  { id: 'geladeira', nome: 'Geladeira / Freezer', categoria: 'cozinha', tipo: 'forca', dr: false, pot: 500, cosPhi: 0.85 },
-  { id: 'micro-ondas', nome: 'Micro-ondas', categoria: 'cozinha', tipo: 'forca', dr: true, pot: 1400, cosPhi: 0.98 },
-  { id: 'forno-cooktop', nome: 'Forno Elétrico / Cooktop Elétrico', categoria: 'cozinha', tipo: 'forca', dr: true, pot: 5000, cosPhi: 1 },
-  { id: 'cooktop-inducao', nome: 'Cooktop por Indução', categoria: 'cozinha', tipo: 'forca', dr: true, pot: 6000, cosPhi: 0.9 },
-  { id: 'lava-loucas', nome: 'Lava-louças', categoria: 'cozinha', tipo: 'forca', dr: true, pot: 2000, cosPhi: 0.9 },
-  { id: 'coifa-exaustor', nome: 'Coifa / Exaustor / Purificador', categoria: 'cozinha', tipo: 'forca', dr: false, pot: 250, cosPhi: 0.8 },
+  // Quarto / Suíte
+  { id: 'quarto-iluminacao', nome: 'Quarto/Suíte — Iluminação', categoria: 'r-quarto', tipo: 'iluminacao', dr: false, pot: 200, cosPhi: 0.95 },
+  { id: 'quarto', nome: 'Quarto/Suíte — Tomadas de Uso Geral', categoria: 'r-quarto', tipo: 'forca', dr: true, pot: 1000, cosPhi: 1 },
 
-  // Lavanderia
-  { id: 'lavanderia', nome: 'Área de Serviço — Tomadas Gerais', categoria: 'lavanderia', tipo: 'forca', dr: true, pot: 2500, cosPhi: 1 },
-  { id: 'maquina-lavar', nome: 'Máquina de Lavar', categoria: 'lavanderia', tipo: 'forca', dr: true, pot: 1500, cosPhi: 0.85 },
-  { id: 'secadora-lava-seca', nome: 'Secadora / Lava e Seca', categoria: 'lavanderia', tipo: 'forca', dr: true, pot: 3200, cosPhi: 0.9 },
-  { id: 'ferro-eletrico', nome: 'Ferro Elétrico / Estação de Passar', categoria: 'lavanderia', tipo: 'forca', dr: true, pot: 1800, cosPhi: 1 },
+  // Banheiro / Lavabo — chuveiro é sempre circuito próprio (maior carga da casa, DR obrigatório)
+  { id: 'banheiro-iluminacao', nome: 'Banheiro/Lavabo — Iluminação', categoria: 'r-banheiro', tipo: 'iluminacao', dr: false, pot: 150, cosPhi: 0.95 },
+  { id: 'banheiro', nome: 'Banheiro/Lavabo — Tomadas de Uso Geral', categoria: 'r-banheiro', tipo: 'forca', dr: true, pot: 1000, cosPhi: 1 },
+  { id: 'chuveiro', nome: 'Chuveiro Elétrico (circuito dedicado)', categoria: 'r-banheiro', tipo: 'forca', dr: true, pot: 7500, cosPhi: 1 },
+  { id: 'torneira-eletrica', nome: 'Torneira Elétrica (circuito dedicado)', categoria: 'r-banheiro', tipo: 'forca', dr: true, pot: 4500, cosPhi: 1 },
+  { id: 'boiler-aquecedor', nome: 'Boiler Elétrico / Aquecedor de Passagem (circuito dedicado)', categoria: 'r-banheiro', tipo: 'forca', dr: true, pot: 5500, cosPhi: 1 },
+  { id: 'banheira-sauna', nome: 'Banheira de Hidromassagem / Sauna (circuito dedicado)', categoria: 'r-banheiro', tipo: 'forca', dr: true, pot: 3000, cosPhi: 0.9 },
 
-  // Aquecimento e banho
-  { id: 'chuveiro', nome: 'Chuveiro Elétrico', categoria: 'banho', tipo: 'forca', dr: true, pot: 7500, cosPhi: 1 },
-  { id: 'torneira-eletrica', nome: 'Torneira Elétrica', categoria: 'banho', tipo: 'forca', dr: true, pot: 4500, cosPhi: 1 },
-  { id: 'boiler-aquecedor', nome: 'Boiler Elétrico / Aquecedor de Passagem', categoria: 'banho', tipo: 'forca', dr: true, pot: 5500, cosPhi: 1 },
-  { id: 'banheira-sauna', nome: 'Banheira de Hidromassagem / Sauna', categoria: 'banho', tipo: 'forca', dr: true, pot: 3000, cosPhi: 0.9 },
+  // Cozinha — tomadas de cozinha são circuito exclusivo por norma; cada eletrodoméstico fixo
+  // de maior potência (TUE) também é circuito dedicado
+  { id: 'cozinha-iluminacao', nome: 'Cozinha — Iluminação', categoria: 'r-cozinha', tipo: 'iluminacao', dr: false, pot: 300, cosPhi: 0.95 },
+  { id: 'cozinha', nome: 'Cozinha — Tomadas de Uso Geral (circuito exclusivo da cozinha)', categoria: 'r-cozinha', tipo: 'forca', dr: true, pot: 3500, cosPhi: 1 },
+  { id: 'geladeira', nome: 'Geladeira / Freezer (circuito dedicado)', categoria: 'r-cozinha', tipo: 'forca', dr: false, pot: 500, cosPhi: 0.85 },
+  { id: 'micro-ondas', nome: 'Micro-ondas (circuito dedicado)', categoria: 'r-cozinha', tipo: 'forca', dr: true, pot: 1400, cosPhi: 0.98 },
+  { id: 'forno-cooktop', nome: 'Forno Elétrico / Cooktop Elétrico (circuito dedicado — a gás não tem circuito de força)', categoria: 'r-cozinha', tipo: 'forca', dr: true, pot: 5000, cosPhi: 1 },
+  { id: 'cooktop-inducao', nome: 'Cooktop por Indução (circuito dedicado)', categoria: 'r-cozinha', tipo: 'forca', dr: true, pot: 6000, cosPhi: 0.9 },
+  { id: 'lava-loucas', nome: 'Lava-louças (circuito dedicado)', categoria: 'r-cozinha', tipo: 'forca', dr: true, pot: 2000, cosPhi: 0.9 },
+  { id: 'coifa-exaustor', nome: 'Coifa / Exaustor / Purificador (circuito dedicado)', categoria: 'r-cozinha', tipo: 'forca', dr: false, pot: 250, cosPhi: 0.8 },
 
-  // Climatização e ventilação
-  { id: 'ar-condicionado', nome: 'Ar-Condicionado', categoria: 'climatizacao', tipo: 'forca', dr: false, pot: 2200, cosPhi: 0.85 },
-  { id: 'ventiladores-exaustao', nome: 'Ventiladores / Ventilação Mecânica / Exaustão', categoria: 'climatizacao', tipo: 'forca', dr: false, pot: 300, cosPhi: 0.8 },
+  // Área de Serviço / Lavanderia — tomadas exclusivas por norma; máquinas em circuito próprio
+  { id: 'lavanderia-iluminacao', nome: 'Área de Serviço — Iluminação', categoria: 'r-lavanderia', tipo: 'iluminacao', dr: false, pot: 150, cosPhi: 0.95 },
+  { id: 'lavanderia', nome: 'Área de Serviço — Tomadas de Uso Geral (circuito exclusivo)', categoria: 'r-lavanderia', tipo: 'forca', dr: true, pot: 2500, cosPhi: 1 },
+  { id: 'maquina-lavar', nome: 'Máquina de Lavar (circuito dedicado)', categoria: 'r-lavanderia', tipo: 'forca', dr: true, pot: 1500, cosPhi: 0.85 },
+  { id: 'secadora-lava-seca', nome: 'Secadora / Lava e Seca (circuito dedicado)', categoria: 'r-lavanderia', tipo: 'forca', dr: true, pot: 3200, cosPhi: 0.9 },
+  { id: 'ferro-eletrico', nome: 'Ferro Elétrico (circuito dedicado)', categoria: 'r-lavanderia', tipo: 'forca', dr: true, pot: 1800, cosPhi: 1 },
 
-  // Área externa e lazer
-  { id: 'piscina-bomba', nome: 'Piscina — Bomba de Filtração', categoria: 'externa', tipo: 'forca', dr: true, pot: 1500, cosPhi: 0.85 },
-  { id: 'piscina-luz', nome: 'Piscina — Iluminação Subaquática', categoria: 'externa', tipo: 'iluminacao', dr: true, pot: 300, cosPhi: 0.95 },
-  { id: 'aquecedor-piscina', nome: 'Aquecedor de Piscina', categoria: 'externa', tipo: 'forca', dr: true, pot: 3000, cosPhi: 1 },
-  { id: 'bomba-recalque-poco', nome: 'Bomba de Recalque / Poço / Pressurização', categoria: 'externa', tipo: 'forca', dr: true, pot: 1000, cosPhi: 0.85 },
-  { id: 'irrigacao', nome: 'Sistema de Irrigação', categoria: 'externa', tipo: 'forca', dr: true, pot: 500, cosPhi: 0.85 },
-  { id: 'gourmet', nome: 'Churrasqueira / Forno Externo / Espaço Gourmet', categoria: 'externa', tipo: 'forca', dr: true, pot: 2000, cosPhi: 1 },
-  { id: 'elevador-plataforma', nome: 'Elevador Residencial / Plataforma de Acessibilidade', categoria: 'externa', tipo: 'forca', dr: true, pot: 2500, cosPhi: 0.8 },
-  { id: 'adega', nome: 'Adega Climatizada / Closet', categoria: 'externa', tipo: 'iluminacao', dr: false, pot: 300, cosPhi: 0.95 },
-  { id: 'tecnica', nome: 'Área Técnica / Casa de Máquinas', categoria: 'externa', tipo: 'forca', dr: false, pot: 2000, cosPhi: 0.85 },
-  { id: 'homeoffice', nome: 'Home Theater / Escritório', categoria: 'externa', tipo: 'forca', dr: false, pot: 1500, cosPhi: 0.9 },
+  // Área Externa / Varanda / Jardim
+  { id: 'externa-iluminacao', nome: 'Área Externa/Jardim — Iluminação', categoria: 'r-externa', tipo: 'iluminacao', dr: true, pot: 300, cosPhi: 0.95 },
+  { id: 'externa', nome: 'Área Externa/Varanda — Tomadas de Uso Geral', categoria: 'r-externa', tipo: 'forca', dr: true, pot: 1500, cosPhi: 1 },
+  { id: 'irrigacao', nome: 'Sistema de Irrigação (circuito dedicado)', categoria: 'r-externa', tipo: 'forca', dr: true, pot: 500, cosPhi: 0.85 },
+
+  // Garagem
+  { id: 'garagem-iluminacao', nome: 'Garagem — Iluminação', categoria: 'r-garagem', tipo: 'iluminacao', dr: false, pot: 150, cosPhi: 0.95 },
+  { id: 'garagem', nome: 'Garagem — Tomadas de Uso Geral', categoria: 'r-garagem', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
+  { id: 'portao-automatico', nome: 'Portão Automático (circuito dedicado)', categoria: 'r-garagem', tipo: 'forca', dr: true, pot: 500, cosPhi: 0.8 },
+
+  // Piscina, área gourmet, adega, home theater — cada equipamento fixo em circuito próprio
+  { id: 'piscina-bomba', nome: 'Piscina — Bomba de Filtração (circuito dedicado)', categoria: 'r-lazer', tipo: 'forca', dr: true, pot: 1500, cosPhi: 0.85 },
+  { id: 'piscina-luz', nome: 'Piscina — Iluminação Subaquática (circuito dedicado)', categoria: 'r-lazer', tipo: 'iluminacao', dr: true, pot: 300, cosPhi: 0.95 },
+  { id: 'aquecedor-piscina', nome: 'Aquecedor de Piscina (circuito dedicado)', categoria: 'r-lazer', tipo: 'forca', dr: true, pot: 3000, cosPhi: 1 },
+  { id: 'bomba-recalque-poco', nome: 'Bomba de Recalque / Poço / Pressurização (circuito dedicado)', categoria: 'r-lazer', tipo: 'forca', dr: true, pot: 1000, cosPhi: 0.85 },
+  { id: 'gourmet-iluminacao', nome: 'Área Gourmet/Churrasqueira — Iluminação', categoria: 'r-lazer', tipo: 'iluminacao', dr: false, pot: 250, cosPhi: 0.95 },
+  { id: 'gourmet', nome: 'Churrasqueira / Forno Externo / Espaço Gourmet — Tomadas (circuito dedicado)', categoria: 'r-lazer', tipo: 'forca', dr: true, pot: 2000, cosPhi: 1 },
+  { id: 'elevador-plataforma', nome: 'Elevador Residencial / Plataforma de Acessibilidade (circuito dedicado)', categoria: 'r-lazer', tipo: 'forca', dr: true, pot: 2500, cosPhi: 0.8 },
+  { id: 'adega-iluminacao', nome: 'Adega Climatizada / Closet — Iluminação', categoria: 'r-lazer', tipo: 'iluminacao', dr: false, pot: 200, cosPhi: 0.95 },
+  { id: 'adega', nome: 'Adega Climatizada / Closet — Tomadas / Climatização', categoria: 'r-lazer', tipo: 'forca', dr: false, pot: 300, cosPhi: 0.95 },
+  { id: 'tecnica', nome: 'Área Técnica / Casa de Máquinas — Tomadas', categoria: 'r-lazer', tipo: 'forca', dr: false, pot: 2000, cosPhi: 0.85 },
+  { id: 'homeoffice-iluminacao', nome: 'Home Theater / Escritório — Iluminação', categoria: 'r-lazer', tipo: 'iluminacao', dr: false, pot: 250, cosPhi: 0.95 },
+  { id: 'homeoffice', nome: 'Home Theater / Escritório — Tomadas', categoria: 'r-lazer', tipo: 'forca', dr: false, pot: 1500, cosPhi: 0.9 },
+
+  // Climatização e ventilação (aplicável a qualquer cômodo, circuito sempre dedicado por unidade)
+  { id: 'ar-condicionado', nome: 'Ar-Condicionado (circuito dedicado por unidade)', categoria: 'r-climatizacao', tipo: 'forca', dr: false, pot: 2200, cosPhi: 0.85 },
+  { id: 'ventiladores-exaustao', nome: 'Ventiladores / Ventilação Mecânica / Exaustão', categoria: 'r-climatizacao', tipo: 'forca', dr: false, pot: 300, cosPhi: 0.8 },
+
+  // Essenciais, segurança e acesso (não pertencem a um cômodo específico)
+  { id: 'iluminacao-emergencia', nome: 'Iluminação de Emergência (circuito dedicado)', categoria: 'r-seguranca', tipo: 'iluminacao', dr: false, pot: 60, cosPhi: 0.95, seguranca: true },
+  { id: 'reserva-tecnica', nome: 'Reserva Técnica (circuito futuro)', categoria: 'r-seguranca', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
+  { id: 'campainha-interfone', nome: 'Campainha / Interfone / Porteiro Eletrônico', categoria: 'r-seguranca', tipo: 'forca', dr: false, pot: 100, cosPhi: 0.9 },
+  { id: 'cftv', nome: 'CFTV', categoria: 'r-seguranca', tipo: 'forca', dr: false, pot: 150, cosPhi: 0.9 },
+  { id: 'alarme', nome: 'Sistema de Alarme', categoria: 'r-seguranca', tipo: 'forca', dr: false, pot: 100, cosPhi: 0.9 },
+  { id: 'cerca-eletrica', nome: 'Cerca Elétrica (circuito dedicado)', categoria: 'r-seguranca', tipo: 'forca', dr: true, pot: 150, cosPhi: 0.9 },
+  { id: 'fechadura-eletrica', nome: 'Fechadura Elétrica', categoria: 'r-seguranca', tipo: 'forca', dr: false, pot: 60, cosPhi: 0.9 },
 
   // Recarga veicular residencial
-  { id: 'carregador-ev', nome: 'Carregador Veicular (EV) — 1º ponto', categoria: 'ev', tipo: 'forca', dr: true, pot: 7400, cosPhi: 0.98 },
-  { id: 'carregador-ev-2', nome: 'Carregador Veicular (EV) — 2º ponto', categoria: 'ev', tipo: 'forca', dr: true, pot: 7400, cosPhi: 0.98 },
+  { id: 'carregador-ev', nome: 'Carregador Veicular (EV) — 1º ponto (circuito dedicado)', categoria: 'r-ev', tipo: 'forca', dr: true, pot: 7400, cosPhi: 0.98 },
+  { id: 'carregador-ev-2', nome: 'Carregador Veicular (EV) — 2º ponto (circuito dedicado)', categoria: 'r-ev', tipo: 'forca', dr: true, pot: 7400, cosPhi: 0.98 },
 
   // Automação (Casa Inteligente) — ver card "Casa inteligente e automação residencial"
   { id: 'quadro-automacao', nome: 'Quadro de Automação', categoria: 'automacao', tipo: 'forca', dr: false, pot: 300, cosPhi: 0.95 },
@@ -1289,9 +1314,9 @@ const AMBIENTES_COMERCIAL = [
   { id: 'com-tomadas-atendimento', nome: 'Tomadas de Atendimento / Balcão / Caixa', categoria: 'com-gerais', tipo: 'forca', dr: true, pot: 1200, cosPhi: 1 },
   { id: 'com-copa-cozinha', nome: 'Copa / Cozinha — Tomadas', categoria: 'com-gerais', tipo: 'forca', dr: true, pot: 3000, cosPhi: 1 },
   { id: 'com-banheiros', nome: 'Banheiros', categoria: 'com-gerais', tipo: 'forca', dr: true, pot: 1000, cosPhi: 1 },
-  { id: 'com-deposito', nome: 'Depósito / Almoxarifado', categoria: 'com-gerais', tipo: 'forca', dr: false, pot: 800, cosPhi: 1 },
+  { id: 'com-deposito', nome: 'Depósito / Almoxarifado', categoria: 'com-gerais', tipo: 'forca', dr: true, pot: 800, cosPhi: 1 },
   { id: 'com-area-tecnica', nome: 'Área Técnica', categoria: 'com-gerais', tipo: 'forca', dr: false, pot: 1500, cosPhi: 0.9 },
-  { id: 'com-reserva-expansao', nome: 'Reserva para Expansão', categoria: 'com-gerais', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
+  { id: 'com-reserva-expansao', nome: 'Reserva para Expansão', categoria: 'com-gerais', tipo: 'forca', dr: true, pot: 1000, cosPhi: 1 },
 
   // Climatização
   { id: 'com-ar-split', nome: 'Ar-Condicionado Individual (Split)', categoria: 'com-climatizacao', tipo: 'forca', dr: false, pot: 2200, cosPhi: 0.85 },
@@ -1364,17 +1389,40 @@ const AMBIENTES_CONDOMINIAL = [
   { id: 'cond-cerca-eletrica', nome: 'Cerca Elétrica', categoria: 'cond-seguranca', tipo: 'forca', dr: true, pot: 150, cosPhi: 0.9 },
   { id: 'cond-iluminacao-emergencia', nome: 'Iluminação de Emergência das Áreas Comuns', categoria: 'cond-seguranca', tipo: 'iluminacao', dr: false, pot: 60, cosPhi: 0.95, seguranca: true },
 
+  // Garagem / Estacionamento comum — diferente da garagem de uma casa: área grande,
+  // compartilhada, geralmente com exaustão mecânica obrigatória em subsolo
+  { id: 'cond-garagem-iluminacao', nome: 'Garagem/Estacionamento Comum — Iluminação', categoria: 'cond-garagem', tipo: 'iluminacao', dr: false, pot: 800, cosPhi: 0.95 },
+  { id: 'cond-garagem-tomadas', nome: 'Garagem/Estacionamento Comum — Tomadas de Uso Geral', categoria: 'cond-garagem', tipo: 'forca', dr: true, pot: 1000, cosPhi: 1 },
+  { id: 'cond-garagem-exaustao', nome: 'Exaustão Mecânica de CO/CO2 (garagem em subsolo — circuito dedicado)', categoria: 'cond-garagem', tipo: 'forca', dr: false, pot: 2200, cosPhi: 0.8 },
+  { id: 'cond-garagem-emergencia', nome: 'Iluminação de Emergência da Garagem (circuito dedicado)', categoria: 'cond-garagem', tipo: 'iluminacao', dr: false, pot: 60, cosPhi: 0.95, seguranca: true },
+
+  // Pilotis / área comum coberta (térreo) — bicicletário, circulação, espera
+  { id: 'cond-pilotis-iluminacao', nome: 'Pilotis — Iluminação', categoria: 'cond-pilotis', tipo: 'iluminacao', dr: false, pot: 500, cosPhi: 0.95 },
+  { id: 'cond-pilotis-tomadas', nome: 'Pilotis — Tomadas de Uso Geral', categoria: 'cond-pilotis', tipo: 'forca', dr: true, pot: 1200, cosPhi: 1 },
+  { id: 'cond-bicicletario', nome: 'Bicicletário — Iluminação', categoria: 'cond-pilotis', tipo: 'iluminacao', dr: false, pot: 150, cosPhi: 0.95 },
+
   // Áreas de lazer e convivência
   { id: 'cond-iluminacao-hall-escadas', nome: 'Iluminação de Hall / Corredores / Escadas', categoria: 'cond-lazer', tipo: 'iluminacao', dr: false, pot: 800, cosPhi: 0.95 },
   { id: 'cond-iluminacao-externa-jardim', nome: 'Iluminação Externa / Jardim', categoria: 'cond-lazer', tipo: 'iluminacao', dr: true, pot: 1000, cosPhi: 0.95 },
-  { id: 'cond-salao-festas', nome: 'Salão de Festas — Iluminação e Tomadas', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 3000, cosPhi: 1 },
-  { id: 'cond-academia', nome: 'Academia do Condomínio', categoria: 'cond-lazer', tipo: 'forca', dr: false, pot: 2000, cosPhi: 0.85 },
+  { id: 'cond-salao-festas-iluminacao', nome: 'Salão de Festas — Iluminação', categoria: 'cond-lazer', tipo: 'iluminacao', dr: false, pot: 500, cosPhi: 0.95 },
+  { id: 'cond-salao-festas', nome: 'Salão de Festas — Tomadas de Uso Geral', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 3000, cosPhi: 1 },
+  { id: 'cond-academia-iluminacao', nome: 'Academia do Condomínio — Iluminação', categoria: 'cond-lazer', tipo: 'iluminacao', dr: false, pot: 400, cosPhi: 0.95 },
+  { id: 'cond-academia', nome: 'Academia do Condomínio — Tomadas / Equipamentos', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 2000, cosPhi: 0.85 },
   { id: 'cond-playground-quadra', nome: 'Playground / Quadra — Iluminação', categoria: 'cond-lazer', tipo: 'iluminacao', dr: true, pot: 600, cosPhi: 0.95 },
-  { id: 'cond-gourmet', nome: 'Churrasqueira / Espaço Gourmet Comum', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 2000, cosPhi: 1 },
+  { id: 'cond-gourmet-iluminacao', nome: 'Churrasqueira / Espaço Gourmet Comum — Iluminação', categoria: 'cond-lazer', tipo: 'iluminacao', dr: false, pot: 300, cosPhi: 0.95 },
+  { id: 'cond-gourmet', nome: 'Churrasqueira / Espaço Gourmet Comum — Tomadas (circuito dedicado)', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 2000, cosPhi: 1 },
   { id: 'cond-piscina-bomba', nome: 'Piscina do Condomínio — Bomba de Filtração', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 2200, cosPhi: 0.85 },
   { id: 'cond-piscina-luz', nome: 'Piscina do Condomínio — Iluminação Subaquática', categoria: 'cond-lazer', tipo: 'iluminacao', dr: true, pot: 300, cosPhi: 0.95 },
   { id: 'cond-piscina-aquecimento', nome: 'Piscina do Condomínio — Aquecimento', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 4500, cosPhi: 1 },
   { id: 'cond-lixo-compactador', nome: 'Sala de Lixo / Compactador', categoria: 'cond-lazer', tipo: 'forca', dr: false, pot: 1000, cosPhi: 0.85 },
+
+  // Lavanderia coletiva e serviços — comum em condomínios (diferente da lavanderia de cada
+  // unidade): equipamentos de porte comercial, cada máquina em circuito dedicado
+  { id: 'cond-lavanderia-iluminacao', nome: 'Lavanderia Coletiva — Iluminação', categoria: 'cond-servicos', tipo: 'iluminacao', dr: false, pot: 200, cosPhi: 0.95 },
+  { id: 'cond-lavanderia-tomadas', nome: 'Lavanderia Coletiva — Tomadas de Uso Geral (circuito exclusivo)', categoria: 'cond-servicos', tipo: 'forca', dr: true, pot: 2000, cosPhi: 1 },
+  { id: 'cond-lavanderia-maquinas', nome: 'Lavanderia Coletiva — Lavadora/Secadora de Porte Comercial (circuito dedicado por máquina)', categoria: 'cond-servicos', tipo: 'forca', dr: true, pot: 3200, cosPhi: 0.9 },
+  { id: 'cond-deposito', nome: 'Depósito / Almoxarifado do Condomínio — Iluminação e Tomadas', categoria: 'cond-servicos', tipo: 'forca', dr: false, pot: 800, cosPhi: 1 },
+  { id: 'cond-zeladoria', nome: 'Zeladoria / Sala de Funcionários — Iluminação e Tomadas', categoria: 'cond-servicos', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
 
   // Elevadores e bombeamento
   { id: 'cond-elevador-social', nome: 'Elevador Social', categoria: 'cond-elevadores', tipo: 'forca', dr: true, pot: 7500, cosPhi: 0.8 },
@@ -2499,7 +2547,7 @@ function detectarSubQuadros(lista) {
   const cftv = lista.filter((c) => CFTV_IDS.includes(c.ambienteId));
   if (cftv.length) grupos.push({ titulo: 'Quadro de CFTV', circuitos: cftv });
   const automacao = lista.filter((c) => c.categoria === 'automacao');
-  if (automacao.length) grupos.push({ titulo: 'Quadro de Comando Inteligente (Automação)', circuitos: automacao });
+  if (automacao.length) grupos.push({ titulo: 'Casa Inteligente', circuitos: automacao });
   return grupos;
 }
 
