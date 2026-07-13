@@ -513,6 +513,35 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       <div id="biblioteca-lista"></div>
     </section>
 
+    <section class="panel" id="painel-perfil">
+      <div class="section-title"><h2>Selecione o perfil da instalação</h2></div>
+      <div class="section-rule"></div>
+      <div class="chips" id="chip-perfil">
+        <label class="chip chip-wide">
+          <input type="radio" name="perfilInstalacao" value="residencial" checked>
+          <strong>Residencial</strong>
+          <span>Casas, apartamentos, condomínios residenciais, áreas comuns, automação residencial e recarga veicular.</span>
+        </label>
+        <label class="chip chip-wide">
+          <input type="radio" name="perfilInstalacao" value="condominial">
+          <strong>Condominial</strong>
+          <span>Áreas comuns de condomínios residenciais ou comerciais — portaria, salão de festas, academia, garagem, iluminação externa e elevadores das áreas comuns.</span>
+        </label>
+        <label class="chip chip-wide">
+          <input type="radio" name="perfilInstalacao" value="comercial">
+          <strong>Comercial</strong>
+          <span>Lojas, escritórios, mercados, restaurantes, hotéis, clínicas, escolas, estacionamentos e estabelecimentos de serviços.</span>
+        </label>
+      </div>
+      <div class="row" id="row-atividade-comercial" style="margin-top:16px;display:none;">
+        <div class="field span-2">
+          <label class="field-label" for="com-atividade">Atividade comercial</label>
+          <select id="com-atividade"></select>
+          <span class="field-hint">Usada como referência no relatório — não restringe quais circuitos podem ser adicionados ao quadro.</span>
+        </div>
+      </div>
+    </section>
+
     <section class="panel" id="painel-identificacao">
       <div class="section-title"><h2>Identificação do empreendimento</h2></div>
       <div class="section-rule"></div>
@@ -524,6 +553,22 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
         <div class="field">
           <label class="field-label" for="id-empreendimento">Nome do empreendimento</label>
           <input type="text" id="id-empreendimento" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <div class="field">
+          <label class="field-label" for="id-cpf">CPF do cliente</label>
+          <input type="text" id="id-cpf" placeholder="000.000.000-00" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="id-rg">RG do cliente</label>
+          <input type="text" id="id-rg" placeholder="00.000.000-0" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <div class="field span-2">
+          <label class="field-label" for="id-orgao-emissor">Órgão emissor do RG</label>
+          <input type="text" id="id-orgao-emissor" placeholder="Ex.: SSP/PA" />
         </div>
       </div>
       <div class="row" style="margin-top:12px;">
@@ -672,35 +717,6 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
         <div class="field span-2">
           <label class="field-label" for="sp-pendencias">Pendências documentais</label>
           <input type="text" id="sp-pendencias" />
-        </div>
-      </div>
-    </section>
-
-    <section class="panel" id="painel-perfil">
-      <div class="section-title"><h2>Selecione o perfil da instalação</h2></div>
-      <div class="section-rule"></div>
-      <div class="chips" id="chip-perfil">
-        <label class="chip chip-wide">
-          <input type="radio" name="perfilInstalacao" value="residencial" checked>
-          <strong>Residencial</strong>
-          <span>Casas, apartamentos, condomínios residenciais, áreas comuns, automação residencial e recarga veicular.</span>
-        </label>
-        <label class="chip chip-wide">
-          <input type="radio" name="perfilInstalacao" value="condominial">
-          <strong>Condominial</strong>
-          <span>Áreas comuns de condomínios residenciais ou comerciais — portaria, salão de festas, academia, garagem, iluminação externa e elevadores das áreas comuns.</span>
-        </label>
-        <label class="chip chip-wide">
-          <input type="radio" name="perfilInstalacao" value="comercial">
-          <strong>Comercial</strong>
-          <span>Lojas, escritórios, mercados, restaurantes, hotéis, clínicas, escolas, estacionamentos e estabelecimentos de serviços.</span>
-        </label>
-      </div>
-      <div class="row" id="row-atividade-comercial" style="margin-top:16px;display:none;">
-        <div class="field span-2">
-          <label class="field-label" for="com-atividade">Atividade comercial</label>
-          <select id="com-atividade"></select>
-          <span class="field-hint">Usada como referência no relatório — não restringe quais circuitos podem ser adicionados ao quadro.</span>
         </div>
       </div>
     </section>
@@ -1838,7 +1854,9 @@ function onChangePerfil() {
 function lerProjeto() {
   return {
     identificacao: {
-      cliente: $('#id-cliente').value, empreendimento: $('#id-empreendimento').value, endereco: $('#id-endereco').value,
+      cliente: $('#id-cliente').value, empreendimento: $('#id-empreendimento').value,
+      cpf: $('#id-cpf').value, rg: $('#id-rg').value, orgaoEmissor: $('#id-orgao-emissor').value,
+      endereco: $('#id-endereco').value,
       cidade: $('#id-cidade').value, estado: $('#id-estado').value, cep: $('#id-cep').value,
       latitude: $('#id-latitude').value, longitude: $('#id-longitude').value,
       tipoObra: $('#id-tipo-obra').value,
@@ -1878,6 +1896,7 @@ function aplicarProjeto(p) {
   if (!p) return;
   const id = p.identificacao || {};
   $('#id-cliente').value = id.cliente || ''; $('#id-empreendimento').value = id.empreendimento || '';
+  $('#id-cpf').value = id.cpf || ''; $('#id-rg').value = id.rg || ''; $('#id-orgao-emissor').value = id.orgaoEmissor || '';
   $('#id-endereco').value = id.endereco || ''; $('#id-cidade').value = id.cidade || ''; $('#id-estado').value = id.estado || '';
   $('#id-cep').value = id.cep || '';
   $('#id-latitude').value = id.latitude || ''; $('#id-longitude').value = id.longitude || '';
@@ -2886,6 +2905,8 @@ function fichaTecnicaHTML() {
     <div class="bom-group-title">Identificação do empreendimento</div>
     <table class="memoria-table ficha-tecnica-table" style="width:100%;">
       ${linha('Cliente', id.cliente)}
+      ${linha('CPF', id.cpf)}
+      ${linha('RG', id.rg ? `${id.rg}${id.orgaoEmissor ? ' — ' + id.orgaoEmissor : ''}` : '')}
       ${linha('Empreendimento', id.empreendimento)}
       ${linha('Endereço', [id.endereco, id.cidade, id.estado, id.cep].filter(Boolean).join(' — '))}
       ${linha('Coordenadas', id.latitude && id.longitude ? `${id.latitude}, ${id.longitude}` : '')}
