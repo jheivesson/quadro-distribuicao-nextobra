@@ -486,13 +486,13 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
         </div>
         <div class="field">
           <label class="field-label" for="id-estado">Estado (UF)</label>
-          <input type="text" id="id-estado" maxlength="2" />
+          <select id="id-estado"></select>
         </div>
       </div>
       <div class="row" style="margin-top:12px;">
         <div class="field">
           <label class="field-label" for="id-cep">CEP</label>
-          <input type="text" id="id-cep" />
+          <input type="text" id="id-cep" placeholder="00000-000" />
         </div>
         <div class="field">
           <label class="field-label" for="id-tipo-obra">Tipo de obra</label>
@@ -503,6 +503,22 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
             <option value="adequacao">Adequação</option>
             <option value="levantamento">Levantamento de instalação existente</option>
           </select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <div class="field">
+          <label class="field-label" for="id-latitude">Latitude</label>
+          <input type="text" id="id-latitude" placeholder="preenchida automaticamente pelo CEP, se possível">
+        </div>
+        <div class="field">
+          <label class="field-label" for="id-longitude">Longitude</label>
+          <input type="text" id="id-longitude" placeholder="preenchida automaticamente pelo CEP, se possível">
+        </div>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <div class="field span-2">
+          <span class="field-hint" id="id-geocoding-status"></span>
+          <a href="#" id="id-ver-mapa" target="_blank" rel="noopener" class="field-hint" style="display:none;">Ver localização no mapa →</a>
         </div>
       </div>
       <div class="row" style="margin-top:12px;">
@@ -1547,6 +1563,97 @@ const AUTO_BINARIAS_LISTA = [
   { id: 'documentacao', label: 'Existe documentação dos dispositivos?' },
 ];
 
+const ESTADOS_BRASIL = [
+  { uf: 'AC', nome: 'Acre' }, { uf: 'AL', nome: 'Alagoas' }, { uf: 'AP', nome: 'Amapá' },
+  { uf: 'AM', nome: 'Amazonas' }, { uf: 'BA', nome: 'Bahia' }, { uf: 'CE', nome: 'Ceará' },
+  { uf: 'DF', nome: 'Distrito Federal' }, { uf: 'ES', nome: 'Espírito Santo' }, { uf: 'GO', nome: 'Goiás' },
+  { uf: 'MA', nome: 'Maranhão' }, { uf: 'MT', nome: 'Mato Grosso' }, { uf: 'MS', nome: 'Mato Grosso do Sul' },
+  { uf: 'MG', nome: 'Minas Gerais' }, { uf: 'PA', nome: 'Pará' }, { uf: 'PB', nome: 'Paraíba' },
+  { uf: 'PR', nome: 'Paraná' }, { uf: 'PE', nome: 'Pernambuco' }, { uf: 'PI', nome: 'Piauí' },
+  { uf: 'RJ', nome: 'Rio de Janeiro' }, { uf: 'RN', nome: 'Rio Grande do Norte' }, { uf: 'RS', nome: 'Rio Grande do Sul' },
+  { uf: 'RO', nome: 'Rondônia' }, { uf: 'RR', nome: 'Roraima' }, { uf: 'SC', nome: 'Santa Catarina' },
+  { uf: 'SP', nome: 'São Paulo' }, { uf: 'SE', nome: 'Sergipe' }, { uf: 'TO', nome: 'Tocantins' },
+];
+function popularEstados() {
+  $('#id-estado').innerHTML = '<option value="">—</option>' + ESTADOS_BRASIL.map((e) => `<option value="${e.uf}">${e.nome} (${e.uf})</option>`).join('');
+}
+
+// Busca de endereço por CEP (ViaCEP) e coordenadas (Nominatim/OpenStreetMap) — depende de
+// internet; se falhar (offline, API fora do ar, CEP não encontrado), cai graciosamente para
+// preenchimento manual, sem travar o resto do formulário.
+let ultimoCepProcessado = '';
+
+async function fetchComTimeout(url, opcoes, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 6000);
+  try {
+    return await fetch(url, { ...opcoes, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function atualizarLinkMapa() {
+  const lat = $('#id-latitude').value.trim(), lon = $('#id-longitude').value.trim();
+  const link = $('#id-ver-mapa');
+  if (lat && lon) {
+    link.href = `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lon)}`;
+    link.style.display = '';
+  } else {
+    link.style.display = 'none';
+  }
+}
+
+async function buscarCoordenadas() {
+  const status = $('#id-geocoding-status');
+  const query = [$('#id-endereco').value, $('#id-cidade').value, $('#id-estado').value, 'Brasil'].filter(Boolean).join(', ');
+  if (!query) { status.textContent = ''; return; }
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${encodeURIComponent(query)}`;
+    const resp = await fetchComTimeout(url, { headers: { Accept: 'application/json' } }, 6000);
+    if (!resp.ok) throw new Error('geocodificação indisponível');
+    const dados = await resp.json();
+    if (!dados.length) throw new Error('sem resultado');
+    $('#id-latitude').value = Number(dados[0].lat).toFixed(6);
+    $('#id-longitude').value = Number(dados[0].lon).toFixed(6);
+    atualizarLinkMapa();
+    status.textContent = 'Endereço e coordenadas localizados automaticamente — confira e ajuste manualmente se precisar.';
+  } catch (e) {
+    status.textContent = 'Endereço localizado pelo CEP, mas não foi possível obter as coordenadas automaticamente agora — preencha latitude/longitude manualmente se precisar delas.';
+  }
+  salvarProjeto();
+}
+
+async function processarCep() {
+  const cepLimpo = $('#id-cep').value.replace(/\D/g, '');
+  if (cepLimpo.length !== 8 || cepLimpo === ultimoCepProcessado) return;
+  ultimoCepProcessado = cepLimpo;
+  const status = $('#id-geocoding-status');
+  status.textContent = 'Localizando endereço pelo CEP...';
+  try {
+    const resp = await fetchComTimeout(`https://viacep.com.br/ws/${cepLimpo}/json/`, {}, 6000);
+    if (!resp.ok) throw new Error('ViaCEP indisponível');
+    const dados = await resp.json();
+    if (dados.erro) throw new Error('CEP não encontrado');
+    if (!$('#id-endereco').dataset.tocado) $('#id-endereco').value = [dados.logradouro, dados.bairro].filter(Boolean).join(', ');
+    if (!$('#id-cidade').dataset.tocado) $('#id-cidade').value = dados.localidade || '';
+    if (dados.uf) $('#id-estado').value = dados.uf;
+    status.textContent = 'Endereço localizado pelo CEP. Buscando coordenadas...';
+    await buscarCoordenadas();
+  } catch (e) {
+    status.textContent = 'Não foi possível localizar o endereço automaticamente por esse CEP — preencha endereço, cidade, estado e coordenadas manualmente.';
+    salvarProjeto();
+  }
+}
+$('#id-cep').addEventListener('input', () => {
+  const cepLimpo = $('#id-cep').value.replace(/\D/g, '');
+  if (cepLimpo.length === 8) processarCep();
+});
+$('#id-endereco').addEventListener('input', () => { $('#id-endereco').dataset.tocado = '1'; });
+$('#id-cidade').addEventListener('input', () => { $('#id-cidade').dataset.tocado = '1'; });
+$('#id-latitude').addEventListener('input', atualizarLinkMapa);
+$('#id-longitude').addEventListener('input', atualizarLinkMapa);
+
 function popularAtividadesComerciais() {
   const sel = $('#com-atividade');
   sel.innerHTML = '<option value="">—</option>' + ATIVIDADES_COMERCIAIS.map((a) => `<option value="${a}">${a}</option>`).join('');
@@ -1678,6 +1785,7 @@ function lerProjeto() {
     identificacao: {
       cliente: $('#id-cliente').value, empreendimento: $('#id-empreendimento').value, endereco: $('#id-endereco').value,
       cidade: $('#id-cidade').value, estado: $('#id-estado').value, cep: $('#id-cep').value,
+      latitude: $('#id-latitude').value, longitude: $('#id-longitude').value,
       tipoObra: $('#id-tipo-obra').value,
       tipoEntrada: (document.querySelector('input[name="tipoEntrada"]:checked') || {}).value || 'monofasica',
       responsavel: $('#id-responsavel').value, data: $('#id-data').value, revisao: $('#id-revisao').value,
@@ -1717,6 +1825,9 @@ function aplicarProjeto(p) {
   $('#id-cliente').value = id.cliente || ''; $('#id-empreendimento').value = id.empreendimento || '';
   $('#id-endereco').value = id.endereco || ''; $('#id-cidade').value = id.cidade || ''; $('#id-estado').value = id.estado || '';
   $('#id-cep').value = id.cep || '';
+  $('#id-latitude').value = id.latitude || ''; $('#id-longitude').value = id.longitude || '';
+  ultimoCepProcessado = (id.cep || '').replace(/\D/g, '');
+  atualizarLinkMapa();
   $('#id-tipo-obra').value = id.tipoObra || 'nova';
   const radioEntrada = document.querySelector(`input[name="tipoEntrada"][value="${id.tipoEntrada || 'monofasica'}"]`);
   if (radioEntrada) radioEntrada.checked = true;
@@ -2681,6 +2792,7 @@ function fichaTecnicaHTML() {
       ${linha('Cliente', id.cliente)}
       ${linha('Empreendimento', id.empreendimento)}
       ${linha('Endereço', [id.endereco, id.cidade, id.estado, id.cep].filter(Boolean).join(' — '))}
+      ${linha('Coordenadas', id.latitude && id.longitude ? `${id.latitude}, ${id.longitude}` : '')}
       ${linha('Tipo de obra', LABEL_TIPO_OBRA[id.tipoObra])}
       ${linha('Perfil da instalação', LABEL_PERFIL[p.perfil])}
       ${linha('Atividade comercial', p.atividadeComercial)}
@@ -2837,6 +2949,7 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
   });
 });
 
+popularEstados();
 popularAmbientes();
 renderComodos();
 popularServicos();
