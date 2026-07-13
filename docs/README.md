@@ -1,8 +1,10 @@
-# Calculadora Elétrica NBR 5410 — NextObra
+# NextObra Engineering Platform
 
-Ferramenta técnica interna da **NextObra Construções**, usada em campo pela equipe técnica para dimensionamento elétrico conforme a **ABNT NBR 5410:2004** (Tabelas 33 a 48).
+**Módulo atual: Levantamento Técnico e Dimensionamento Elétrico conforme NBR 5410.**
 
-> Este documento descreve o projeto **exatamente como ele existe hoje**. Nenhuma funcionalidade, tecnologia ou processo listado aqui foi planejado ou idealizado — tudo reflete o código real em `index.html`.
+Ferramenta técnica interna da **NextObra Construções**, usada em campo pela equipe técnica para dimensionamento elétrico conforme a **ABNT NBR 5410:2004** (Tabelas 33 a 48). É o primeiro módulo da NextObra Engineering Platform — o nome da plataforma comporta, em visão de longo prazo, futuros módulos de engenharia da empresa, mas nenhum outro módulo além deste foi definido ou iniciado até o momento (ver `PROJECT_VISION.md`).
+
+> Este documento descreve o projeto **exatamente como ele existe hoje**. Nenhuma funcionalidade, tecnologia ou processo listado aqui foi planejado ou idealizado — tudo reflete o código real em `index.html`. Para propósito, missão, visão e princípios, ver `PROJECT_VISION.md`.
 
 ## Objetivo da plataforma
 
@@ -37,15 +39,20 @@ O escopo cobre atualmente **três perfis de instalação**: Residencial, Condomi
 Calculadora_Eletrica_NBR5410/
 ├── .git/
 ├── .netlify/                 (config gerada pela CLI do Netlify)
+├── CLAUDE.md                  (regras de orientação para sessões de desenvolvimento)
 ├── docs/                     (esta pasta de documentação)
 │   ├── README.md
+│   ├── PROJECT_VISION.md
 │   ├── PROJECT_OVERVIEW.md
 │   ├── ARCHITECTURE.md
 │   ├── ROADMAP.md
 │   ├── CHANGELOG.md
-│   └── DEVELOPMENT_RULES.md
+│   ├── DEVELOPMENT_RULES.md
+│   └── TECHNICAL_RENDERING_ENGINE.md
 └── index.html                 (ÚNICO arquivo de código-fonte — ~3.200 linhas)
 ```
+
+> Nota de nomenclatura: o diretório do repositório e o site publicado ainda usam o nome técnico anterior (`Calculadora_Eletrica_NBR5410` / `nextobra-calculadora-eletrica.netlify.app`) — renomear pasta, repositório ou site é uma mudança de infraestrutura/deploy, fora do escopo desta atualização de documentação. O nome comercial da plataforma, daqui em diante, é **NextObra Engineering Platform**.
 
 Todo o código-fonte da aplicação vive em um único arquivo: `index.html`, contendo:
 - bloco `<style>` — CSS da aplicação (design tokens, layout, impressão);
