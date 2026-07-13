@@ -377,7 +377,12 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media print {
-  @page { size: A4 landscape; margin: 12mm; }
+  /* Dimensões explícitas (297mm x 210mm, largura > altura = paisagem) em vez da palavra-chave
+     "A4 landscape" — mais respeitado entre navegadores. Mesmo assim, a caixa de diálogo de
+     impressão do navegador pode não aplicar isso sozinha (é uma preferência do usuário que o
+     Chrome nem sempre sincroniza com o CSS) — por isso também avisamos na tela antes do clique
+     em "Gerar PDF" para conferir/trocar para Paisagem manualmente se necessário. */
+  @page { size: 297mm 210mm; margin: 12mm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
   #login-screen, .masthead-bar, .form-panel, .circuitos-panel, .servicos, .disclaimer, .pdf-card,
   #painel-identificacao, #painel-situacao-projeto, #painel-perfil, #painel-automacao,
@@ -2970,6 +2975,7 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
       <div class="pdf-card-txt">
         <h3>Exportar relatório em PDF</h3>
         <p>Gera um PDF com o veredito, a imagem do quadro, o detalhamento técnico e a lista de materiais — pronto para encaminhar ao escritório.</p>
+        <p style="color:var(--warn-deep, #a56a0e); font-weight:600;">⚠ Na janela de impressão, confira se o <strong>Layout/Orientação está em "Paisagem" (Horizontal)</strong> — o relatório é largo (tabela técnica e diagrama do quadro) e o navegador às vezes abre em "Retrato" por padrão, mesmo esse documento pedindo paisagem. Se abrir em retrato, troque manualmente antes de salvar.</p>
       </div>
       <button class="btn btn-orange" id="btn-exportar-pdf">Gerar PDF</button>
     </div>
