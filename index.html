@@ -428,6 +428,10 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       </div>
       <div class="masthead-right">
         <div class="norm-badge">ABNT NBR 5410:2004 · tabelas 33–48</div>
+        <button class="btn-logout" id="btn-novo-projeto" title="Apaga os dados salvos neste navegador e começa um projeto em branco">Novo Projeto</button>
+        <button class="btn-logout" id="btn-exportar-projeto" title="Baixa um arquivo .json com todos os dados deste projeto">Exportar Projeto</button>
+        <button class="btn-logout" id="btn-importar-projeto" title="Abre um arquivo .json exportado por esta ferramenta">Importar Projeto</button>
+        <input type="file" id="input-importar-projeto" accept="application/json" style="display:none;">
         <button class="btn-logout" id="btn-logout">Sair</button>
       </div>
     </div>
@@ -1766,6 +1770,64 @@ function carregarProjeto() {
     aplicarProjeto(dados.projeto);
   } catch (e) { /* dado corrompido — ignora e começa do zero */ }
 }
+
+// Controle de projeto — o autosave é proposital (evita perder o trabalho ao recarregar a
+// página sem querer), mas o usuário precisa conseguir começar um projeto novo, ou salvar/
+// abrir projetos diferentes como arquivo — sem isso, o autosave vira uma armadilha.
+function novoProjeto() {
+  const ok = confirm('Isso vai apagar os dados deste projeto salvos neste navegador (identificação, circuitos, anexos). Se quiser guardar o projeto atual, clique em "Exportar Projeto" antes de continuar. Deseja começar um projeto novo em branco?');
+  if (!ok) return;
+  safeStorageRemove(PROJETO_KEY);
+  location.reload();
+}
+
+function nomeArquivoProjeto() {
+  const p = lerProjeto();
+  const base = (p.identificacao.empreendimento || p.identificacao.cliente || 'projeto').trim();
+  const slug = base.replace(/[^\w\- ]+/g, '').replace(/\s+/g, '-') || 'projeto';
+  return `levantamento-eletrico-${slug}-${new Date().toISOString().slice(0, 10)}.json`;
+}
+
+function exportarProjeto() {
+  const payload = { projeto: lerProjeto(), circuitos, proximoId };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeArquivoProjeto();
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importarProjeto(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const dados = JSON.parse(reader.result);
+      if (!dados || typeof dados !== 'object') throw new Error('formato inválido');
+      if (dados.circuitos) { circuitos = dados.circuitos; proximoId = dados.proximoId || (circuitos.length + 1); }
+      aplicarProjeto(dados.projeto);
+      quadroDesatualizado = true;
+      renderComodos();
+      renderListaCircuitos();
+      render();
+      salvarProjeto();
+    } catch (e) {
+      alert('Não foi possível abrir esse arquivo — verifique se é um arquivo de projeto exportado por esta ferramenta (.json).');
+    }
+  };
+  reader.readAsText(file);
+}
+$('#btn-novo-projeto').addEventListener('click', novoProjeto);
+$('#btn-exportar-projeto').addEventListener('click', exportarProjeto);
+$('#btn-importar-projeto').addEventListener('click', () => $('#input-importar-projeto').click());
+$('#input-importar-projeto').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) importarProjeto(file);
+  e.target.value = '';
+});
 
 /* ============ CÔMODOS E PONTOS ATENDIDOS (checklist com queda de tensão ao vivo) ============ */
 // Parâmetros padrão de instalação assumidos no modo checklist — quem precisar de sistema
