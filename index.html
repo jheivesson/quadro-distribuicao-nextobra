@@ -3002,7 +3002,20 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
       <button class="btn btn-orange" id="btn-exportar-pdf">Gerar PDF</button>
     </div>
   `;
-  $('#btn-exportar-pdf').addEventListener('click', () => window.print());
+  $('#btn-exportar-pdf').addEventListener('click', () => {
+    // Aviso bloqueante (não só texto na tela) — o Chrome não troca sozinho o Layout da
+    // janela de impressão para Paisagem só porque o CSS pede; é uma preferência que fica
+    // com o usuário. Isso garante que a instrução seja vista toda vez, antes da janela abrir.
+    alert(
+      'ANTES DE SALVAR O PDF:\n\n' +
+      'Na janela de impressão que vai abrir agora, procure o campo "Layout" ou "Orientação" ' +
+      '(geralmente logo abaixo do nome da impressora) e confira se está em "Paisagem" (Horizontal).\n\n' +
+      'Se estiver em "Retrato", troque para "Paisagem" antes de clicar em Salvar — este relatório ' +
+      'é largo (tabela técnica e desenho do quadro) e sai cortado/errado em retrato.\n\n' +
+      'Se não aparecer a opção de primeira, clique em "Mais configurações" na janela de impressão.'
+    );
+    window.print();
+  });
   $('#quadro-panel').style.display = 'block';
   $('#quadro-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   quadroDesatualizado = false;
