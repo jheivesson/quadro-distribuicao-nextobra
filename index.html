@@ -227,6 +227,24 @@ input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-v
 .bin-row:last-child { border-bottom: none; }
 .bin-row .bin-label { font-size: 13.5px; color: var(--ink); }
 
+/* ---- dropdown com checkbox (documentos disponíveis) ---- */
+.multiselect-dropdown { position: relative; }
+.multiselect-toggle {
+  width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  font-family: var(--font-body); font-size: 13.5px; color: var(--ink); background: var(--paper-2);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; cursor: pointer; text-align: left;
+}
+.multiselect-toggle .chev { flex: none; color: var(--ink-faint); transition: transform .15s ease; }
+.multiselect-dropdown.aberto .multiselect-toggle { border-color: var(--blue); }
+.multiselect-dropdown.aberto .multiselect-toggle .chev { transform: rotate(180deg); }
+.multiselect-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 16px 36px -12px rgba(16,26,44,.28); max-height: 320px; overflow-y: auto; padding: 6px;
+}
+.multiselect-panel .comodo-row { margin-bottom: 4px; }
+.multiselect-panel .comodo-row:last-child { margin-bottom: 0; }
+
 /* ---- checklist de cômodos / pontos atendidos ---- */
 .comodo-categoria-titulo { font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--navy); margin: 18px 0 8px; }
 .comodo-categoria-titulo:first-child { margin-top: 0; }
@@ -688,7 +706,13 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
         <div class="field span-2">
           <span class="field-label">Documentos disponíveis</span>
           <span class="field-hint">Marque o documento e anexe o arquivo (PDF, DWG/DXF, imagem ou ZIP) quando tiver em mãos — fica salvo junto com o projeto neste navegador. Arquivos acima de 3 MB não são anexados automaticamente (limite do armazenamento local); só o nome fica registrado.</span>
-          <div id="sp-documentos" style="margin-top:8px;"></div>
+          <div class="multiselect-dropdown" id="dropdown-documentos" style="margin-top:8px;">
+            <button type="button" class="multiselect-toggle" id="btn-dropdown-documentos">
+              <span id="dropdown-documentos-label">Nenhum documento selecionado</span>
+              <svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="multiselect-panel" id="sp-documentos" style="display:none;"></div>
+          </div>
         </div>
       </div>
       <div class="row" style="margin-top:12px;">
@@ -1737,6 +1761,28 @@ function popularAtividadesComerciais() {
 const MAX_ANEXO_BYTES = 3 * 1024 * 1024;
 let anexosDocumentos = {};
 
+function atualizarLabelDocumentos() {
+  const n = $all('.sp-doc-check:checked').length;
+  const label = $('#dropdown-documentos-label');
+  if (!label) return;
+  label.textContent = n === 0 ? 'Nenhum documento selecionado' : `${n} documento${n === 1 ? '' : 's'} selecionado${n === 1 ? '' : 's'}`;
+}
+
+$('#btn-dropdown-documentos').addEventListener('click', (e) => {
+  e.stopPropagation();
+  $('#dropdown-documentos').classList.toggle('aberto');
+  const painel = $('#sp-documentos');
+  painel.style.display = painel.style.display === 'none' ? '' : 'none';
+});
+document.addEventListener('click', (e) => {
+  const dropdown = $('#dropdown-documentos');
+  if (dropdown && dropdown.classList.contains('aberto') && !dropdown.contains(e.target)) {
+    dropdown.classList.remove('aberto');
+    $('#sp-documentos').style.display = 'none';
+  }
+});
+$('#sp-documentos').addEventListener('click', (e) => e.stopPropagation());
+
 function popularDocumentosSituacao() {
   $('#sp-documentos').innerHTML = SP_DOCUMENTOS.map((d, i) => `
     <div class="comodo-row" id="sp-doc-row-${i}">
@@ -1757,9 +1803,11 @@ function popularDocumentosSituacao() {
       $(`.sp-doc-anexo[data-idx="${i}"]`).style.display = chk.checked ? '' : 'none';
       $(`#sp-doc-row-${i}`).classList.toggle('ativo', chk.checked);
       if (!chk.checked) { delete anexosDocumentos[i]; renderAnexoInfo(i); }
+      atualizarLabelDocumentos();
       salvarProjeto();
     });
   });
+  atualizarLabelDocumentos();
 
   $all('.sp-doc-arquivo').forEach((inp) => {
     inp.addEventListener('change', () => {
@@ -1922,6 +1970,7 @@ function aplicarProjeto(p) {
     }
   });
   Object.keys(anexosDocumentos).forEach((i) => renderAnexoInfo(i));
+  atualizarLabelDocumentos();
   $('#sp-responsavel').value = sp.responsavel || ''; $('#sp-data').value = sp.data || '';
   $('#sp-revisao').value = sp.revisao || ''; $('#sp-observacoes').value = sp.observacoes || ''; $('#sp-pendencias').value = sp.pendencias || '';
 
