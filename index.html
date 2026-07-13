@@ -412,7 +412,7 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
   @page { size: 297mm 210mm; margin: 12mm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
   #login-screen, .masthead-bar, .form-panel, .circuitos-panel, .servicos, .disclaimer, .pdf-card,
-  #painel-identificacao, #painel-situacao-projeto, #painel-perfil, #painel-automacao,
+  #painel-identificacao, #painel-situacao-projeto, #painel-perfil, #painel-config-instalacao, #painel-automacao,
   #painel-biblioteca, #painel-comodos, .tela-apenas { display: none !important; }
   .ficha-tecnica-table { break-inside: avoid; }
   body { background: #fff; }
@@ -531,35 +531,6 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       <div id="biblioteca-lista"></div>
     </section>
 
-    <section class="panel" id="painel-perfil">
-      <div class="section-title"><h2>Selecione o perfil da instalação</h2></div>
-      <div class="section-rule"></div>
-      <div class="chips" id="chip-perfil">
-        <label class="chip chip-wide">
-          <input type="radio" name="perfilInstalacao" value="residencial" checked>
-          <strong>Residencial</strong>
-          <span>Casas, apartamentos, condomínios residenciais, áreas comuns, automação residencial e recarga veicular.</span>
-        </label>
-        <label class="chip chip-wide">
-          <input type="radio" name="perfilInstalacao" value="condominial">
-          <strong>Condominial</strong>
-          <span>Áreas comuns de condomínios residenciais ou comerciais — portaria, salão de festas, academia, garagem, iluminação externa e elevadores das áreas comuns.</span>
-        </label>
-        <label class="chip chip-wide">
-          <input type="radio" name="perfilInstalacao" value="comercial">
-          <strong>Comercial</strong>
-          <span>Lojas, escritórios, mercados, restaurantes, hotéis, clínicas, escolas, estacionamentos e estabelecimentos de serviços.</span>
-        </label>
-      </div>
-      <div class="row" id="row-atividade-comercial" style="margin-top:16px;display:none;">
-        <div class="field span-2">
-          <label class="field-label" for="com-atividade">Atividade comercial</label>
-          <select id="com-atividade"></select>
-          <span class="field-hint">Usada como referência no relatório — não restringe quais circuitos podem ser adicionados ao quadro.</span>
-        </div>
-      </div>
-    </section>
-
     <section class="panel" id="painel-identificacao">
       <div class="section-title"><h2>Identificação do empreendimento</h2></div>
       <div class="section-rule"></div>
@@ -637,7 +608,41 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
           <a href="#" id="id-ver-mapa" target="_blank" rel="noopener" class="field-hint" style="display:none;">Ver localização no mapa →</a>
         </div>
       </div>
-      <div class="row" style="margin-top:12px;">
+    </section>
+
+    <section class="panel" id="painel-perfil">
+      <div class="section-title"><h2>Selecione o perfil da instalação</h2></div>
+      <div class="section-rule"></div>
+      <div class="chips" id="chip-perfil">
+        <label class="chip chip-wide">
+          <input type="radio" name="perfilInstalacao" value="residencial" checked>
+          <strong>Residencial</strong>
+          <span>Casas, apartamentos, condomínios residenciais, áreas comuns, automação residencial e recarga veicular.</span>
+        </label>
+        <label class="chip chip-wide">
+          <input type="radio" name="perfilInstalacao" value="condominial">
+          <strong>Condominial</strong>
+          <span>Áreas comuns de condomínios residenciais ou comerciais — portaria, salão de festas, academia, garagem, iluminação externa e elevadores das áreas comuns.</span>
+        </label>
+        <label class="chip chip-wide">
+          <input type="radio" name="perfilInstalacao" value="comercial">
+          <strong>Comercial</strong>
+          <span>Lojas, escritórios, mercados, restaurantes, hotéis, clínicas, escolas, estacionamentos e estabelecimentos de serviços.</span>
+        </label>
+      </div>
+      <div class="row" id="row-atividade-comercial" style="margin-top:16px;display:none;">
+        <div class="field span-2">
+          <label class="field-label" for="com-atividade">Atividade comercial</label>
+          <select id="com-atividade"></select>
+          <span class="field-hint">Usada como referência no relatório — não restringe quais circuitos podem ser adicionados ao quadro.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="painel-config-instalacao">
+      <div class="section-title"><h2>Configuração da instalação</h2></div>
+      <div class="section-rule"></div>
+      <div class="row">
         <div class="field span-2 highlight">
           <span class="field-label">Tipo de entrada de serviço</span>
           <div class="chips" id="chip-tipo-entrada">
@@ -3124,7 +3129,7 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
     if (e.target.name === 'perfilInstalacao') onChangePerfil();
     if (e.target.id === 'auto-casa-inteligente') atualizarVisibilidadeAutomacao();
     if (e.target.name === 'autoNeutro') atualizarVisibilidadeSolucaoNeutro();
-    const painelProjeto = e.target.closest && e.target.closest('#painel-identificacao, #painel-situacao-projeto, #painel-perfil, #painel-automacao');
+    const painelProjeto = e.target.closest && e.target.closest('#painel-identificacao, #painel-situacao-projeto, #painel-perfil, #painel-config-instalacao, #painel-automacao');
     if (painelProjeto) salvarProjeto();
   });
 });
