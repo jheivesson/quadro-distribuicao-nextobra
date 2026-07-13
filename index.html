@@ -428,6 +428,7 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       </div>
       <div class="masthead-right">
         <div class="norm-badge">ABNT NBR 5410:2004 · tabelas 33–48</div>
+        <button class="btn-logout" id="btn-biblioteca" title="Abre a biblioteca de projetos salvos neste navegador">Biblioteca</button>
         <button class="btn-logout" id="btn-novo-projeto" title="Apaga os dados salvos neste navegador e começa um projeto em branco">Novo Projeto</button>
         <button class="btn-logout" id="btn-exportar-projeto" title="Baixa um arquivo .json com todos os dados deste projeto">Exportar Projeto</button>
         <button class="btn-logout" id="btn-importar-projeto" title="Abre um arquivo .json exportado por esta ferramenta">Importar Projeto</button>
@@ -442,6 +443,22 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <div><strong>Ferramenta de apoio técnico, não substitui o projetista.</strong> Os valores tabelados seguem as tabelas 36–48 da ABNT NBR 5410:2004. Use em campo e em reunião para apontar conformidade — sempre confira a edição vigente da norma e as condições reais da instalação antes da execução.</div>
     </div>
+
+    <section class="panel" id="painel-biblioteca" style="display:none;">
+      <div class="section-title"><h2>Biblioteca de Projetos</h2><span class="count" id="biblioteca-count">0 projetos salvos</span></div>
+      <div class="section-rule"></div>
+      <div class="field-hint" style="margin-bottom:14px;">Salve o projeto atual na biblioteca com um nome — depois é só abrir de novo pra continuar editando. Cada projeto salvo fica guardado neste navegador, separado dos outros.</div>
+      <div class="row">
+        <div class="field span-2">
+          <label class="field-label" for="biblioteca-nome">Nome do projeto</label>
+          <input type="text" id="biblioteca-nome" placeholder="Ex.: Residência Souza — Rua das Flores 123">
+        </div>
+      </div>
+      <div class="btn-row" style="justify-content:flex-start;">
+        <button class="btn btn-orange" id="btn-salvar-biblioteca">Salvar projeto atual na biblioteca</button>
+      </div>
+      <div id="biblioteca-lista" style="margin-top:18px;"></div>
+    </section>
 
     <section class="panel" id="painel-identificacao">
       <div class="section-title"><h2>Identificação do empreendimento</h2></div>
@@ -1828,6 +1845,124 @@ $('#input-importar-projeto').addEventListener('change', (e) => {
   if (file) importarProjeto(file);
   e.target.value = '';
 });
+
+/* ============ BIBLIOTECA DE PROJETOS ============ */
+// Guarda vários projetos nomeados neste navegador (diferente do autosave, que só protege o
+// rascunho atual). Cada entrada tem seu próprio id, nome e cópia completa do projeto.
+const BIBLIOTECA_KEY = 'nextobra_qdc_biblioteca';
+let projetoBibliotecaAtualId = null;
+
+function carregarBiblioteca() {
+  const raw = safeStorageGet(BIBLIOTECA_KEY);
+  if (!raw) return [];
+  try { return JSON.parse(raw) || []; } catch (e) { return []; }
+}
+function persistirBiblioteca(lista) {
+  try {
+    localStorage.setItem(BIBLIOTECA_KEY, JSON.stringify(lista));
+    return true;
+  } catch (e) {
+    alert('Não foi possível salvar na biblioteca — o armazenamento local deste navegador está cheio. Exporte este projeto como arquivo (.json) para não perder os dados.');
+    return false;
+  }
+}
+
+function renderBiblioteca() {
+  const lista = carregarBiblioteca();
+  $('#biblioteca-count').textContent = `${lista.length} projeto${lista.length === 1 ? '' : 's'} salvo${lista.length === 1 ? '' : 's'}`;
+  if (!lista.length) {
+    $('#biblioteca-lista').innerHTML = '<div class="empty-state">Nenhum projeto salvo na biblioteca ainda.</div>';
+    return;
+  }
+  const linhas = lista.slice().sort((a, b) => b.dataModificacao - a.dataModificacao).map((p) => `
+    <div class="comodo-row">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div>
+          <strong>${escaparXML(p.nome)}</strong>${p.id === projetoBibliotecaAtualId ? ' <span class="chip-dr">aberto agora</span>' : ''}
+          <div class="field-hint">${LABEL_PERFIL[(p.projeto && p.projeto.perfil) || 'residencial']} · ${(p.circuitos || []).length} circuito(s) · atualizado em ${new Date(p.dataModificacao).toLocaleString('pt-BR')}</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline btn-abrir-biblioteca" data-bid="${p.id}">Abrir</button>
+          <button class="btn-remove btn-excluir-biblioteca" data-bid="${p.id}">Excluir</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  $('#biblioteca-lista').innerHTML = linhas;
+  $all('.btn-abrir-biblioteca').forEach((btn) => btn.addEventListener('click', () => abrirProjetoDaBiblioteca(btn.dataset.bid)));
+  $all('.btn-excluir-biblioteca').forEach((btn) => btn.addEventListener('click', () => excluirProjetoDaBiblioteca(btn.dataset.bid)));
+}
+
+function salvarProjetoNaBiblioteca() {
+  const nome = $('#biblioteca-nome').value.trim();
+  if (!nome) { alert('Dê um nome ao projeto antes de salvar na biblioteca.'); return; }
+  const lista = carregarBiblioteca();
+  const payload = { projeto: lerProjeto(), circuitos, proximoId };
+  const agora = Date.now();
+  const idx = projetoBibliotecaAtualId ? lista.findIndex((p) => p.id === projetoBibliotecaAtualId) : -1;
+  if (idx >= 0) {
+    lista[idx] = { ...lista[idx], nome, dataModificacao: agora, ...payload };
+  } else {
+    const novo = { id: 'proj-' + agora + '-' + Math.random().toString(36).slice(2, 8), nome, dataModificacao: agora, ...payload };
+    lista.push(novo);
+    projetoBibliotecaAtualId = novo.id;
+  }
+  if (persistirBiblioteca(lista)) {
+    renderBiblioteca();
+    alert(`Projeto "${nome}" salvo na biblioteca.`);
+  }
+}
+
+function abrirProjetoDaBiblioteca(id) {
+  const lista = carregarBiblioteca();
+  const entrada = lista.find((p) => p.id === id);
+  if (!entrada) return;
+  if (circuitos.length > 0) {
+    const ok = confirm('Abrir esse projeto substitui os dados que estão na tela agora. Se não estiverem salvos na biblioteca, serão perdidos. Deseja continuar?');
+    if (!ok) return;
+  }
+  circuitos = entrada.circuitos || [];
+  proximoId = entrada.proximoId || (circuitos.length + 1);
+  aplicarProjeto(entrada.projeto);
+  projetoBibliotecaAtualId = entrada.id;
+  $('#biblioteca-nome').value = entrada.nome;
+  quadroDesatualizado = true;
+  renderComodos();
+  renderListaCircuitos();
+  render();
+  salvarProjeto();
+  renderBiblioteca();
+  $('#quadro-panel').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function excluirProjetoDaBiblioteca(id) {
+  const lista = carregarBiblioteca();
+  const entrada = lista.find((p) => p.id === id);
+  if (!entrada) return;
+  const ok = confirm(`Excluir "${entrada.nome}" da biblioteca? Essa ação não pode ser desfeita.`);
+  if (!ok) return;
+  const nova = lista.filter((p) => p.id !== id);
+  if (persistirBiblioteca(nova)) {
+    if (projetoBibliotecaAtualId === id) projetoBibliotecaAtualId = null;
+    renderBiblioteca();
+  }
+}
+
+$('#btn-biblioteca').addEventListener('click', () => {
+  const painel = $('#painel-biblioteca');
+  const visivel = painel.style.display !== 'none';
+  painel.style.display = visivel ? 'none' : 'block';
+  if (!visivel) {
+    renderBiblioteca();
+    if (!$('#biblioteca-nome').value) {
+      const p = lerProjeto();
+      $('#biblioteca-nome').value = p.identificacao.empreendimento || p.identificacao.cliente || '';
+    }
+    painel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
+$('#btn-salvar-biblioteca').addEventListener('click', salvarProjetoNaBiblioteca);
 
 /* ============ CÔMODOS E PONTOS ATENDIDOS (checklist com queda de tensão ao vivo) ============ */
 // Parâmetros padrão de instalação assumidos no modo checklist — quem precisar de sistema
