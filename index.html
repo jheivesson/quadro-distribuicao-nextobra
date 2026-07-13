@@ -471,6 +471,17 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
         </div>
       </div>
       <div class="row" style="margin-top:12px;">
+        <div class="field span-2 highlight">
+          <span class="field-label">Tipo de entrada de serviço</span>
+          <div class="chips" id="chip-tipo-entrada">
+            <label class="chip"><input type="radio" name="tipoEntrada" value="monofasica" checked>Monofásica (1F + N)</label>
+            <label class="chip"><input type="radio" name="tipoEntrada" value="bifasica">Bifásica (2F + N)</label>
+            <label class="chip"><input type="radio" name="tipoEntrada" value="trifasica">Trifásica (3F + N)</label>
+          </div>
+          <span class="field-hint">Define o disjuntor geral e as barras de fase do desenho do quadro — independe do sistema de cada circuito individual.</span>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px;">
         <div class="field">
           <label class="field-label" for="id-responsavel">Responsável técnico</label>
           <input type="text" id="id-responsavel" />
@@ -570,18 +581,18 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
           <span>Casas, apartamentos, condomínios residenciais, áreas comuns, automação residencial e recarga veicular.</span>
         </label>
         <label class="chip chip-wide">
+          <input type="radio" name="perfilInstalacao" value="condominial">
+          <strong>Condominial</strong>
+          <span>Áreas comuns de condomínios residenciais ou comerciais — portaria, salão de festas, academia, garagem, iluminação externa e elevadores das áreas comuns.</span>
+        </label>
+        <label class="chip chip-wide">
           <input type="radio" name="perfilInstalacao" value="comercial">
           <strong>Comercial</strong>
           <span>Lojas, escritórios, mercados, restaurantes, hotéis, clínicas, escolas, estacionamentos e estabelecimentos de serviços.</span>
         </label>
-        <label class="chip chip-wide">
-          <input type="radio" name="perfilInstalacao" value="industrial">
-          <strong>Industrial</strong>
-          <span>Fábricas, galpões, centros logísticos, plantas de processo, oficinas e instalações com motores, máquinas ou automação industrial.</span>
-        </label>
       </div>
       <div class="disclaimer" id="perfil-indisponivel" style="display:none;margin-top:16px;margin-bottom:0;">
-        <div>As bibliotecas de circuitos <strong>comercial</strong> e <strong>industrial</strong> ainda não foram implementadas nesta versão — estão previstas para as próximas fases. Selecione <strong>Residencial</strong> para usar a calculadora agora.</div>
+        <div>As bibliotecas de circuitos <strong>condominial</strong> e <strong>comercial</strong> ainda não foram implementadas nesta versão — estão previstas para as próximas fases. Selecione <strong>Residencial</strong> para usar a calculadora agora. O módulo <strong>industrial</strong> ficará de fora por enquanto: demanda dados de motores, partida e automação industrial que merecem um levantamento próprio, à parte deste documento.</div>
       </div>
     </section>
 
@@ -1336,6 +1347,7 @@ function lerProjeto() {
       cliente: $('#id-cliente').value, empreendimento: $('#id-empreendimento').value, endereco: $('#id-endereco').value,
       cidade: $('#id-cidade').value, estado: $('#id-estado').value, cep: $('#id-cep').value, uc: $('#id-uc').value,
       concessionaria: $('#id-concessionaria').value, tipoObra: $('#id-tipo-obra').value,
+      tipoEntrada: (document.querySelector('input[name="tipoEntrada"]:checked') || {}).value || 'monofasica',
       responsavel: $('#id-responsavel').value, data: $('#id-data').value, revisao: $('#id-revisao').value,
       observacoes: $('#id-observacoes').value,
     },
@@ -1371,7 +1383,10 @@ function aplicarProjeto(p) {
   $('#id-cliente').value = id.cliente || ''; $('#id-empreendimento').value = id.empreendimento || '';
   $('#id-endereco').value = id.endereco || ''; $('#id-cidade').value = id.cidade || ''; $('#id-estado').value = id.estado || '';
   $('#id-cep').value = id.cep || ''; $('#id-uc').value = id.uc || ''; $('#id-concessionaria').value = id.concessionaria || '';
-  $('#id-tipo-obra').value = id.tipoObra || 'nova'; $('#id-responsavel').value = id.responsavel || '';
+  $('#id-tipo-obra').value = id.tipoObra || 'nova';
+  const radioEntrada = document.querySelector(`input[name="tipoEntrada"][value="${id.tipoEntrada || 'monofasica'}"]`);
+  if (radioEntrada) radioEntrada.checked = true;
+  $('#id-responsavel').value = id.responsavel || '';
   $('#id-data').value = id.data || ''; $('#id-revisao').value = id.revisao || ''; $('#id-observacoes').value = id.observacoes || '';
 
   const sp = p.situacaoProjeto || {};
@@ -1704,6 +1719,33 @@ function svgRail(x, y, w) {
   return `<rect x="${x}" y="${y}" width="${w}" height="7" rx="1.5" fill="url(#railGrad)" stroke="#8b959c" stroke-width="0.6"/>`;
 }
 
+// Cores de fase — a NBR 5410 exige apenas que as fases sejam distinguíveis entre si e do
+// neutro (azul-claro) e do PE (verde / verde-amarelo); preto/marrom/vermelho é a convenção
+// mais usada na prática brasileira para F1/F2/F3, adotada aqui só para leitura do desenho.
+const FASE_CORES = { F1: '#1a1a1a', F2: '#6b4226', F3: '#b23a32' };
+const FASES_POR_ENTRADA = {
+  monofasica: [{ cor: FASE_CORES.F1, label: 'F' }],
+  bifasica: [{ cor: FASE_CORES.F1, label: 'F1' }, { cor: FASE_CORES.F2, label: 'F2' }],
+  trifasica: [{ cor: FASE_CORES.F1, label: 'F1' }, { cor: FASE_CORES.F2, label: 'F2' }, { cor: FASE_CORES.F3, label: 'F3' }],
+};
+const POLOS_GERAL_POR_ENTRADA = { monofasica: 2, bifasica: 2, trifasica: 4 };
+
+function svgFaseBars(x, y, w, fases) {
+  const H = 14, GAP = 4;
+  let s = '';
+  fases.forEach((f, i) => {
+    const by = y + i * (H + GAP);
+    s += `<rect x="${x}" y="${by}" width="${w}" height="${H}" rx="3" fill="${f.cor}"/>`;
+    const n = Math.max(4, Math.round(w / 42));
+    for (let j = 0; j < n; j++) {
+      const cx = x + (w / n) * (j + 0.5);
+      s += `<circle cx="${cx}" cy="${by + H / 2}" r="2.4" fill="#ffffff" opacity="0.85"/>`;
+    }
+    s += `<text x="${x - 8}" y="${by + H / 2 + 3}" text-anchor="end" font-size="8.5" font-weight="700" fill="${f.cor}" font-family="JetBrains Mono, monospace">${f.label}</text>`;
+  });
+  return { svg: s, height: fases.length * H + Math.max(0, fases.length - 1) * GAP };
+}
+
 function svgTerminalBar(x, y, w, color, label) {
   let s = `<rect x="${x}" y="${y}" width="${w}" height="20" rx="4" fill="${color}"/>`;
   const n = Math.max(4, Math.round(w / 42));
@@ -1715,21 +1757,24 @@ function svgTerminalBar(x, y, w, color, label) {
   return s;
 }
 
-function gerarSVGQuadro(circuitos) {
+function gerarSVGQuadro(circuitos, tipoEntrada) {
+  tipoEntrada = FASES_POR_ENTRADA[tipoEntrada] ? tipoEntrada : 'monofasica';
   const semDR = circuitos.filter((c) => !c.exigeDR);
   const comDR = circuitos.filter((c) => c.exigeDR);
   const gruposDR = agruparPorDR(comDR, 4);
 
   const somaIbGeral = circuitos.reduce((s, c) => s + c.resultado.ib, 0);
   const disjuntorGeral = escolherDisjuntor(somaIbGeral, Infinity);
-  const geralPolos = circuitos.some((c) => c.params.sistema === 'trifasico') ? 4 : 2;
+  const geralPolos = POLOS_GERAL_POR_ENTRADA[tipoEntrada];
+  const fases = FASES_POR_ENTRADA[tipoEntrada];
+  const rotuloGeral = { monofasica: 'GERAL MONO', bifasica: 'GERAL BI', trifasica: 'GERAL TRI' }[tipoEntrada];
 
   const MOD_W = 52, MOD_H = 78, ROW_GAP = 44, PAD = 30, ROW_CAP = 8;
 
   const rows = [];
   rows.push({
     devices: [
-      { kind: 'geral', mods: geralPolos >= 4 ? 4 : 2, l1: `${disjuntorGeral ?? '—'}A`, l2: 'GERAL' },
+      { kind: 'geral', mods: geralPolos >= 4 ? 4 : 2, l1: `${disjuntorGeral ?? '—'}A`, l2: rotuloGeral },
       { kind: 'dps', mods: 2, l1: 'DPS', l2: 'CLASSE II' },
     ],
   });
@@ -1758,7 +1803,8 @@ function gerarSVGQuadro(circuitos) {
   const maxMods = Math.max(...rows.map((r) => r.devices.reduce((s, d) => s + d.mods, 0)));
   const innerW = maxMods * MOD_W;
   const W = innerW + PAD * 2 + 30;
-  const H = PAD * 2 + 34 + rows.length * (MOD_H + ROW_GAP) + 34;
+  const faseBarsHeight = fases.length * 14 + Math.max(0, fases.length - 1) * 4;
+  const H = PAD * 2 + faseBarsHeight + 10 + 34 + rows.length * (MOD_H + ROW_GAP) + 34;
 
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px" xmlns="http://www.w3.org/2000/svg">`;
   svg += `<defs>
@@ -1769,6 +1815,9 @@ function gerarSVGQuadro(circuitos) {
   svg += `<rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="14" fill="#eef1f3" stroke="#c7d0d8" stroke-width="1.5"/>`;
 
   let y = PAD;
+  const faseBars = svgFaseBars(PAD + 30, y, innerW - 30, fases);
+  svg += faseBars.svg;
+  y += faseBars.height + 10;
   svg += svgTerminalBar(PAD + 30, y, innerW - 30, '#2b6cb5', 'N');
   y += 34;
 
@@ -1791,7 +1840,7 @@ function gerarSVGQuadro(circuitos) {
 
   svg += svgTerminalBar(PAD + 30, y, innerW - 30, '#2f9e5b', 'PE');
   svg += `</svg>`;
-  return { svg, disjuntorGeral, geralPolos, somaIbGeral };
+  return { svg, disjuntorGeral, geralPolos, somaIbGeral, tipoEntrada };
 }
 
 function escaparXML(str) {
@@ -1939,7 +1988,8 @@ function assinaturaHTML() {
 const LABEL_TIPO_OBRA = { nova: 'Nova', reforma: 'Reforma', ampliacao: 'Ampliação', adequacao: 'Adequação', levantamento: 'Levantamento de instalação existente' };
 const LABEL_EXISTE_PROJETO = { sim: 'Sim', nao: 'Não', parcial: 'Documentação parcial' };
 const LABEL_SITUACAO_PROJETO = { preliminar: 'Projeto preliminar', basico: 'Projeto básico', executivo: 'Projeto executivo', desenvolvimento: 'Projeto em desenvolvimento', aprovado: 'Projeto aprovado', desatualizado: 'Projeto desatualizado', 'as-built': 'Levantamento "as built"', unifilar: 'Somente diagrama unifilar', 'sem-documentacao': 'Sem documentação técnica' };
-const LABEL_PERFIL = { residencial: 'Residencial', comercial: 'Comercial', industrial: 'Industrial' };
+const LABEL_PERFIL = { residencial: 'Residencial', condominial: 'Condominial (áreas comuns)', comercial: 'Comercial' };
+const LABEL_TIPO_ENTRADA = { monofasica: 'Monofásica (1F + N)', bifasica: 'Bifásica (2F + N)', trifasica: 'Trifásica (3F + N)' };
 const LABEL_CASA_INTELIGENTE = { nao: 'Não', basica: 'Sim, automação básica', intermediaria: 'Sim, automação intermediária', completa: 'Sim, automação completa', ampliacao: 'Automação existente ampliada', reforma: 'Automação existente reformada' };
 const LABEL_USA_ALEXA = { sim: 'Sim', nao: 'Não', indefinido: 'Ainda não definido', integrado: 'Alexa integrada com outro sistema' };
 
@@ -1961,6 +2011,7 @@ function fichaTecnicaHTML() {
       ${linha('Concessionária', id.concessionaria)}
       ${linha('Tipo de obra', LABEL_TIPO_OBRA[id.tipoObra])}
       ${linha('Perfil da instalação', LABEL_PERFIL[p.perfil])}
+      ${linha('Tipo de entrada de serviço', LABEL_TIPO_ENTRADA[id.tipoEntrada])}
       ${linha('Responsável técnico', id.responsavel)}
       ${linha('Data', id.data)}
       ${linha('Revisão', id.revisao)}
@@ -2010,8 +2061,11 @@ function printHeaderHTML() {
 
 $('#btn-gerar-quadro').addEventListener('click', () => {
   if (circuitos.length === 0) return;
-  const { svg, disjuntorGeral, geralPolos, somaIbGeral } = gerarSVGQuadro(circuitos);
+  const projetoAtual = lerProjeto();
+  const tipoEntrada = projetoAtual.identificacao.tipoEntrada;
+  const { svg, disjuntorGeral, geralPolos, somaIbGeral } = gerarSVGQuadro(circuitos, tipoEntrada);
   const bom = gerarBOMConsolidada(circuitos, { disjuntorGeral, geralPolos });
+  const legendaQuadro = `<div class="field-hint" style="margin-bottom:8px;">Quadro — ${LABEL_PERFIL[projetoAtual.perfil] || 'Residencial'} · Entrada ${LABEL_TIPO_ENTRADA[tipoEntrada]} · Disjuntor geral ${geralPolos >= 4 ? 'tetrapolar' : 'bipolar'} ${disjuntorGeral ?? '—'} A</div>`;
 
   const totalConforme = circuitos.filter((c) => c.resultado.conforme).length;
   const todosConformes = totalConforme === circuitos.length;
@@ -2025,6 +2079,7 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
     ${printHeaderHTML()}
     ${fichaTecnicaHTML()}
     ${veredictoGeral}
+    ${legendaQuadro}
     <div class="diagrama-container">${svg}</div>
     ${detalhesTecnicosHTML(circuitos)}
     ${bomTableHTML('Proteção geral', bom.grupoProtecao)}
