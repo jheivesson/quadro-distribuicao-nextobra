@@ -377,18 +377,45 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media print {
+  @page { size: A4 landscape; margin: 12mm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
   #login-screen, .masthead-bar, .form-panel, .circuitos-panel, .servicos, .disclaimer, .pdf-card,
-  #painel-identificacao, #painel-situacao-projeto, #painel-perfil, #painel-automacao { display: none !important; }
+  #painel-identificacao, #painel-situacao-projeto, #painel-perfil, #painel-automacao,
+  #painel-biblioteca, #painel-comodos, .tela-apenas { display: none !important; }
   .ficha-tecnica-table { break-inside: avoid; }
   body { background: #fff; }
+  html, body { width: auto; overflow-x: visible; }
   .wrap { padding: 0; max-width: none; }
   .quadro-panel.panel { border: none; box-shadow: none; padding: 0; }
   .print-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 2px solid var(--navy); }
   .print-header img { height: 40px; }
   .print-header h2 { font-size: 16px; color: var(--navy); }
   .print-header p { font-size: 11px; color: var(--ink-faint); margin: 2px 0 0; }
-  .diagrama-container, .bom-table, table.circuitos { break-inside: avoid; }
+
+  /* Nada pode ter largura fixa maior que a página impressa — diagrama e tabelas largas
+     precisam encolher pra caber, nunca estourar (senão o PDF sai cortado/inválido). */
+  /* Sem break-inside:avoid aqui de propósito: num quadro com muitos circuitos o diagrama
+     fica mais alto que uma página inteira, e "avoid" só desperdiça uma página em branco
+     tentando (e falhando) empurrar tudo pra página seguinte. Deixar quebrar naturalmente
+     é pior visualmente (pode cortar uma linha de disjuntores ao meio) mas nunca fica com
+     conteúdo faltando ou página em branco. Borda arredondada removida no modo impressão —
+     uma caixa com border-radius que precisa fragmentar entre páginas pode deixar uma
+     página "fantasma" só com o fundo, sem o conteúdo, no Chrome. */
+  .diagrama-container { overflow: visible !important; max-width: 100%; padding: 10px; border-radius: 0; border: none; background: none; }
+  /* Não force width:100% aqui — o SVG já tem width="100%" + max-width:${W}px inline, que
+     encolhe corretamente até o tamanho natural do diagrama. Forçar width:100% no modo
+     impressão estica diagramas pequenos ao tamanho da página inteira e, em diagramas com
+     muitos circuitos, pode fazer o conteúdo inteiro sumir do PDF (bug observado no Chrome). */
+  .table-wrap { overflow: visible !important; max-width: 100%; }
+  table.circuitos, table.tabela-tecnica { min-width: 0 !important; width: 100%; table-layout: auto; }
+  table.tabela-tecnica { font-size: 7px; }
+  table.tabela-tecnica th, table.tabela-tecnica td { padding: 3px 4px; white-space: normal; word-break: break-word; }
+  table.tabela-tecnica .chip-status { white-space: nowrap; font-size: 6.5px; padding: 2px 5px; }
+  .bom-table, .memoria-table { font-size: 10px; word-break: break-word; }
+  .bom-table td, .bom-table th { padding: 5px 8px; }
+  img, svg { max-width: 100%; }
+
+  .bom-table, table.circuitos { break-inside: avoid; }
   .veredito-geral { break-inside: avoid; }
   .assinatura { break-inside: avoid; }
 }
@@ -934,8 +961,8 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
     </section>
 
     <section class="panel quadro-panel" id="quadro-panel" style="display:none;">
-      <div class="section-title"><h2>Quadro de Distribuição</h2></div>
-      <div class="section-rule"></div>
+      <div class="section-title tela-apenas"><h2>Quadro de Distribuição</h2></div>
+      <div class="section-rule tela-apenas"></div>
       <div id="quadro-conteudo"></div>
     </section>
 
@@ -2465,24 +2492,44 @@ function truncarTexto(str, n) {
   return s.length > n ? s.slice(0, n - 1) + '…' : s;
 }
 
-function svgBreaker(x, y, w, h, label1, label2, conforme) {
+function svgToggle(cx, topY, corBase, corClaro) {
+  // alavanca do disjuntor em dois tons, com uma leve borda de brilho — não é fotorrealista,
+  // mas lê melhor como uma chave liga/desliga do que um retângulo chapado
+  let s = `<rect x="${cx - 6}" y="${topY}" width="12" height="20" rx="2.5" fill="${corBase}"/>`;
+  s += `<rect x="${cx - 6}" y="${topY}" width="12" height="7" rx="2.5" fill="${corClaro}" opacity="0.55"/>`;
+  s += `<rect x="${cx - 6}" y="${topY}" width="12" height="20" rx="2.5" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="0.6"/>`;
+  return s;
+}
+
+// Sombra "falsa" desenhada como retângulo escuro deslocado, nunca via <filter>/url() — SVG
+// gerado dinamicamente (innerHTML) tem um bug conhecido do Chrome onde gradientes e filtros
+// referenciados por url(#id) somem silenciosamente na exportação para PDF, mesmo aparecendo
+// normalmente na tela. Cores sólidas e formas simples são o que se pode confiar no PDF.
+function svgSombraFalsa(x, y, w, h, rx) {
+  return `<rect x="${x + 1.4}" y="${y + 2.2}" width="${w}" height="${h}" rx="${rx}" fill="#0f1720" opacity="0.16"/>`;
+}
+
+function svgBreaker(x, y, w, h, label1, label2, conforme, titulo) {
   const stroke = conforme === false ? '#b23a32' : '#8b959c';
   const sw = conforme === false ? 2 : 1;
   let s = '<g>';
-  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="url(#greyGrad)" stroke="${stroke}" stroke-width="${sw}"/>`;
-  s += `<rect x="${x + w / 2 - 6}" y="${y + 9}" width="12" height="20" rx="2" fill="#3a4248"/>`;
+  if (titulo) s += `<title>${escaparXML(titulo)}</title>`;
+  s += svgSombraFalsa(x, y, w, h, 4);
+  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="#e7ebed" stroke="${stroke}" stroke-width="${sw}"/>`;
+  s += svgToggle(x + w / 2, y + 9, '#31373d', '#6b757d');
   s += `<circle cx="${x + w / 2}" cy="${y + 6}" r="2.2" fill="#9aa3ab"/>`;
   s += `<circle cx="${x + w / 2}" cy="${y + h - 6}" r="2.2" fill="#9aa3ab"/>`;
-  s += `<text x="${x + w / 2}" y="${y + h - 25}" text-anchor="middle" font-size="9.5" font-weight="700" fill="#16202c" font-family="JetBrains Mono, monospace">${label1}</text>`;
-  s += `<text x="${x + w / 2}" y="${y + h - 13}" text-anchor="middle" font-size="6.4" fill="#55636f" font-family="-apple-system, sans-serif">${escaparXML(label2)}</text>`;
+  s += `<text x="${x + w / 2}" y="${y + h - 24}" text-anchor="middle" font-size="9.5" font-weight="700" fill="#16202c" font-family="JetBrains Mono, monospace">${label1}</text>`;
+  s += `<text x="${x + w / 2}" y="${y + h - 11}" text-anchor="middle" font-size="8" font-weight="700" fill="#1f6fa8" font-family="JetBrains Mono, monospace">${escaparXML(label2)}</text>`;
   s += '</g>';
   return s;
 }
 
 function svgRCD(x, y, w, h, label1, label2) {
   let s = '<g>';
-  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="url(#redGrad)" stroke="#7c211a" stroke-width="1"/>`;
-  s += `<rect x="${x + w / 2 - 7}" y="${y + 9}" width="14" height="18" rx="2" fill="#5c1611"/>`;
+  s += svgSombraFalsa(x, y, w, h, 4);
+  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="#c94a3f" stroke="#7c211a" stroke-width="1"/>`;
+  s += svgToggle(x + w / 2, y + 9, '#4a120e', '#8a352c');
   s += `<circle cx="${x + 12}" cy="${y + h - 11}" r="4.2" fill="#f4d9d6" stroke="#7c211a" stroke-width="1"/>`;
   s += `<text x="${x + w / 2}" y="${y + h - 25}" text-anchor="middle" font-size="9.5" font-weight="700" fill="#ffffff" font-family="JetBrains Mono, monospace">${label1}</text>`;
   s += `<text x="${x + w / 2}" y="${y + h - 13}" text-anchor="middle" font-size="6.4" fill="#fbdad7" font-family="-apple-system, sans-serif">${escaparXML(label2)}</text>`;
@@ -2492,8 +2539,9 @@ function svgRCD(x, y, w, h, label1, label2) {
 
 function svgDPS(x, y, w, h, label1, label2) {
   let s = '<g>';
-  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="url(#greyGrad)" stroke="#f2901e" stroke-width="1.6"/>`;
-  s += `<rect x="${x + w / 2 - 6}" y="${y + 9}" width="12" height="20" rx="2" fill="#f2901e"/>`;
+  s += svgSombraFalsa(x, y, w, h, 4);
+  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="#e7ebed" stroke="#f2901e" stroke-width="1.6"/>`;
+  s += svgToggle(x + w / 2, y + 9, '#c9740f', '#f7ad55');
   s += `<text x="${x + w / 2}" y="${y + h - 25}" text-anchor="middle" font-size="8.6" font-weight="700" fill="#16202c" font-family="JetBrains Mono, monospace">${label1}</text>`;
   s += `<text x="${x + w / 2}" y="${y + h - 13}" text-anchor="middle" font-size="6.4" fill="#55636f" font-family="-apple-system, sans-serif">${escaparXML(label2)}</text>`;
   s += '</g>';
@@ -2501,7 +2549,7 @@ function svgDPS(x, y, w, h, label1, label2) {
 }
 
 function svgRail(x, y, w) {
-  return `<rect x="${x}" y="${y}" width="${w}" height="7" rx="1.5" fill="url(#railGrad)" stroke="#8b959c" stroke-width="0.6"/>`;
+  return `<rect x="${x}" y="${y}" width="${w}" height="7" rx="1.5" fill="#c3cad0" stroke="#8b959c" stroke-width="0.6"/>`;
 }
 
 // Cores de fase — a NBR 5410 exige apenas que as fases sejam distinguíveis entre si e do
@@ -2556,6 +2604,11 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
 
   const MOD_W = 52, MOD_H = 78, ROW_GAP = 44, PAD = 30, ROW_CAP = 8;
 
+  // Cada disjuntor mostra o número do circuito (mesma numeração da tabela de detalhamento
+  // técnico) em vez do nome truncado — evita nomes cortados feios e é como painéis reais
+  // costumam ser legendados (número no disjuntor, descrição completa numa lista à parte).
+  const numeroPorId = new Map(circuitos.map((c, i) => [c.id, i + 1]));
+
   const rows = [];
   rows.push({
     devices: [
@@ -2571,7 +2624,7 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
     const devices = [{ kind: 'idr', mods: idrPolos, l1: `${idr ?? '—'}A`, l2: `IDR-${gi + 1} 30mA` }];
     grupo.forEach((c) => {
       const polos = c.params.sistema === 'trifasico' ? 3 : 1;
-      devices.push({ kind: 'breaker', mods: polos, l1: `${c.resultado.inom}A`, l2: truncarTexto(c.descricao, 11), conforme: c.resultado.conforme });
+      devices.push({ kind: 'breaker', mods: polos, l1: `${c.resultado.inom}A`, l2: `C${numeroPorId.get(c.id)}`, titulo: c.descricao, conforme: c.resultado.conforme });
     });
     rows.push({ devices });
   });
@@ -2580,7 +2633,7 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
   semDR.forEach((c) => {
     const polos = c.params.sistema === 'trifasico' ? 3 : 1;
     if (atualMods + polos > ROW_CAP && atual.length) { rows.push({ devices: atual }); atual = []; atualMods = 0; }
-    atual.push({ kind: 'breaker', mods: polos, l1: `${c.resultado.inom}A`, l2: truncarTexto(c.descricao, 11), conforme: c.resultado.conforme });
+    atual.push({ kind: 'breaker', mods: polos, l1: `${c.resultado.inom}A`, l2: `C${numeroPorId.get(c.id)}`, titulo: c.descricao, conforme: c.resultado.conforme });
     atualMods += polos;
   });
   if (atual.length) rows.push({ devices: atual });
@@ -2591,13 +2644,12 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
   const faseBarsHeight = fases.length * 14 + Math.max(0, fases.length - 1) * 4;
   const H = PAD * 2 + faseBarsHeight + 10 + 34 + rows.length * (MOD_H + ROW_GAP) + 34;
 
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px" xmlns="http://www.w3.org/2000/svg">`;
-  svg += `<defs>
-    <linearGradient id="greyGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f8f9"/><stop offset="1" stop-color="#d5dadd"/></linearGradient>
-    <linearGradient id="redGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8635a"/><stop offset="1" stop-color="#b83a30"/></linearGradient>
-    <linearGradient id="railGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e7ebed"/><stop offset="0.5" stop-color="#aeb6bd"/><stop offset="1" stop-color="#e7ebed"/></linearGradient>
-  </defs>`;
+  // width/height explícitos (além do viewBox) dão ao navegador uma proporção intrínseca
+  // confiável — sem eles, o pipeline de impressão/PDF do Chrome pode calcular a altura
+  // errada e encolher todo o conteúdo interno a quase nada, sobrando só o fundo do painel.
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%; max-width:${W}px; height:auto;" xmlns="http://www.w3.org/2000/svg">`;
   svg += `<rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="14" fill="#eef1f3" stroke="#c7d0d8" stroke-width="1.5"/>`;
+  svg += `<rect x="9" y="9" width="${W - 18}" height="${H - 18}" rx="9" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.7"/>`;
 
   let y = PAD;
   const faseBars = svgFaseBars(PAD + 30, y, innerW - 30, fases);
@@ -2614,9 +2666,9 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
     let x = PAD + (innerW - rowW) / 2;
     row.devices.forEach((d) => {
       const w = d.mods * MOD_W - 6;
-      if (d.kind === 'breaker') svg += svgBreaker(x, y, w, MOD_H, d.l1, d.l2, d.conforme);
+      if (d.kind === 'breaker') svg += svgBreaker(x, y, w, MOD_H, d.l1, d.l2, d.conforme, d.titulo);
       else if (d.kind === 'idr') svg += svgRCD(x, y, w, MOD_H, d.l1, d.l2);
-      else if (d.kind === 'geral') svg += svgBreaker(x, y, w, MOD_H, d.l1, d.l2, true);
+      else if (d.kind === 'geral') svg += svgBreaker(x, y, w, MOD_H, d.l1, d.l2, true, null);
       else if (d.kind === 'dps') svg += svgDPS(x, y, w, MOD_H, d.l1, d.l2);
       x += d.mods * MOD_W;
     });
@@ -2854,14 +2906,14 @@ const CFTV_IDS = ['cftv', 'com-cftv-acesso', 'cond-cftv'];
 function detectarSubQuadros(lista) {
   const grupos = [];
   const cftv = lista.filter((c) => CFTV_IDS.includes(c.ambienteId));
-  if (cftv.length) grupos.push({ titulo: 'Quadro de CFTV', circuitos: cftv });
+  if (cftv.length) grupos.push({ id: 'cftv', titulo: 'Quadro de CFTV', circuitos: cftv });
   const automacao = lista.filter((c) => c.categoria === 'automacao');
-  if (automacao.length) grupos.push({ titulo: 'Casa Inteligente', circuitos: automacao });
+  if (automacao.length) grupos.push({ id: 'casainteligente', titulo: 'Casa Inteligente', circuitos: automacao });
   return grupos;
 }
 
-function subQuadroHTML(titulo, lista, tipoEntrada) {
-  const { svg, disjuntorGeral, geralPolos } = gerarSVGQuadro(lista, tipoEntrada);
+function subQuadroHTML(titulo, lista, tipoEntrada, idSufixo) {
+  const { svg, disjuntorGeral, geralPolos } = gerarSVGQuadro(lista, tipoEntrada, idSufixo);
   const bom = gerarBOMConsolidada(lista, { disjuntorGeral, geralPolos });
   return `
     <div class="bom-group-title">${titulo}</div>
@@ -2881,9 +2933,9 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
   if (circuitos.length === 0) return;
   const projetoAtual = lerProjeto();
   const tipoEntrada = projetoAtual.identificacao.tipoEntrada;
-  const { svg, disjuntorGeral, geralPolos, somaIbGeral } = gerarSVGQuadro(circuitos, tipoEntrada);
+  const { svg, disjuntorGeral, geralPolos, somaIbGeral } = gerarSVGQuadro(circuitos, tipoEntrada, 'geral');
   const bom = gerarBOMConsolidada(circuitos, { disjuntorGeral, geralPolos });
-  const legendaQuadro = `<div class="field-hint" style="margin-bottom:8px;">Quadro — ${LABEL_PERFIL[projetoAtual.perfil] || 'Residencial'} · Entrada ${LABEL_TIPO_ENTRADA[tipoEntrada]} · Disjuntor geral ${geralPolos >= 4 ? 'tetrapolar' : 'bipolar'} ${disjuntorGeral ?? '—'} A</div>`;
+  const legendaQuadro = `<div class="field-hint" style="margin-bottom:8px;">Quadro — ${LABEL_PERFIL[projetoAtual.perfil] || 'Residencial'} · Entrada ${LABEL_TIPO_ENTRADA[tipoEntrada]} · Disjuntor geral ${geralPolos >= 4 ? 'tetrapolar' : 'bipolar'} ${disjuntorGeral ?? '—'} A · o número em cada disjuntor (C1, C2…) corresponde à linha "Nº" da tabela de detalhamento técnico logo abaixo</div>`;
 
   const totalConforme = circuitos.filter((c) => c.resultado.conforme).length;
   const todosConformes = totalConforme === circuitos.length;
@@ -2894,7 +2946,7 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
     : `<div class="veredito-geral fail"><div class="icon-circle">${iconX()}</div><div><h3>${naoConformes.length} DE ${circuitos.length} CIRCUITOS FORA DA NORMA</h3><p>Revisar: ${naoConformes.map((c) => escaparXML(c.descricao)).join(', ')}.</p></div></div>`;
 
   const subQuadros = detectarSubQuadros(circuitos);
-  const subQuadrosHTML = subQuadros.map((g) => subQuadroHTML(g.titulo, g.circuitos, tipoEntrada)).join('');
+  const subQuadrosHTML = subQuadros.map((g) => subQuadroHTML(g.titulo, g.circuitos, tipoEntrada, g.id)).join('');
 
   $('#quadro-conteudo').innerHTML = `
     ${printHeaderHTML()}
