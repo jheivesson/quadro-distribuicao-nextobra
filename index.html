@@ -142,6 +142,12 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 .masthead-title .eyebrow { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--orange); font-weight: 600; }
 .masthead-title h1 { font-size: 18px; color: #fff; font-weight: 700; }
 .masthead-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#barra-salvar-flutuante {
+  position: fixed; bottom: 22px; right: 22px; z-index: 60; display: flex; gap: 8px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 100px;
+  padding: 8px; box-shadow: 0 10px 30px -8px rgba(16,26,44,.35);
+}
+@media (max-width: 640px) { #barra-salvar-flutuante { left: 12px; right: 12px; bottom: 12px; } #barra-salvar-flutuante .btn { flex: 1; } }
 #status-autosave { display: flex; align-items: center; gap: 6px; transition: border-color .3s ease; }
 .dot-salvo { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #49c07f; flex: none; }
 #status-autosave.piscando { border-color: #49c07f; }
@@ -452,6 +458,10 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
 </div>
 
 <div id="app">
+  <div id="barra-salvar-flutuante" class="tela-apenas">
+    <button class="btn btn-orange" id="btn-salvar-flutuante" title="Baixa um arquivo .json com todo o projeto no seu computador">💾 Salvar Projeto</button>
+    <button class="btn btn-outline" id="btn-abrir-flutuante" title="Abre um arquivo .json de projeto salvo anteriormente">📂 Abrir Projeto</button>
+  </div>
   <div class="masthead-bar">
     <div class="masthead-inner">
       <div class="masthead-left">
@@ -2005,6 +2015,8 @@ function importarProjeto(file) {
 $('#btn-novo-projeto').addEventListener('click', novoProjeto);
 $('#btn-exportar-projeto').addEventListener('click', exportarProjeto);
 $('#btn-importar-projeto').addEventListener('click', () => $('#input-importar-projeto').click());
+$('#btn-salvar-flutuante').addEventListener('click', exportarProjeto);
+$('#btn-abrir-flutuante').addEventListener('click', () => $('#input-importar-projeto').click());
 $('#input-importar-projeto').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) importarProjeto(file);
