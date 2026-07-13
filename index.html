@@ -591,8 +591,15 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
           <span>Lojas, escritórios, mercados, restaurantes, hotéis, clínicas, escolas, estacionamentos e estabelecimentos de serviços.</span>
         </label>
       </div>
-      <div class="disclaimer" id="perfil-indisponivel" style="display:none;margin-top:16px;margin-bottom:0;">
-        <div>As bibliotecas de circuitos <strong>condominial</strong> e <strong>comercial</strong> ainda não foram implementadas nesta versão — estão previstas para as próximas fases. Selecione <strong>Residencial</strong> para usar a calculadora agora. O módulo <strong>industrial</strong> ficará de fora por enquanto: demanda dados de motores, partida e automação industrial que merecem um levantamento próprio, à parte deste documento.</div>
+      <div class="row" id="row-atividade-comercial" style="margin-top:16px;display:none;">
+        <div class="field span-2">
+          <label class="field-label" for="com-atividade">Atividade comercial</label>
+          <select id="com-atividade"></select>
+          <span class="field-hint">Usada como referência no relatório — não restringe quais circuitos podem ser adicionados ao quadro.</span>
+        </div>
+      </div>
+      <div class="disclaimer" style="margin-top:16px;margin-bottom:0;">
+        <div>O módulo <strong>industrial</strong> fica de fora por enquanto: demanda dados de motores, partida e automação industrial que merecem um levantamento próprio, à parte deste documento.</div>
       </div>
     </section>
 
@@ -1141,10 +1148,27 @@ const CATEGORIAS_AMBIENTE = {
   externa: 'Área externa e lazer',
   ev: 'Recarga veicular residencial',
   automacao: 'Automação (Casa Inteligente)',
+  'com-gerais': 'Circuitos comerciais gerais',
+  'com-climatizacao': 'Climatização',
+  'com-tecnologia': 'Tecnologia e segurança',
+  'com-transporte': 'Transporte (elevadores / escadas rolantes)',
+  'com-bombeamento': 'Bombeamento',
+  'com-cozinha': 'Cozinha comercial',
+  'com-especiais': 'Cargas comerciais especiais',
+  'com-ev': 'Recarga veicular comercial',
+  'cond-seguranca': 'Segurança e acesso',
+  'cond-lazer': 'Áreas de lazer e convivência',
+  'cond-elevadores': 'Elevadores e bombeamento',
+  'cond-ev': 'Recarga veicular (áreas comuns)',
   outros: 'Outros',
 };
 
-const AMBIENTES = [
+function perfilAtual() {
+  const el = document.querySelector('input[name="perfilInstalacao"]:checked');
+  return el ? el.value : 'residencial';
+}
+
+const AMBIENTES_RESIDENCIAL = [
   // Essenciais / iluminação / segurança
   { id: 'sala', nome: 'Sala de Estar / Jantar', categoria: 'essenciais', tipo: 'forca', dr: false, pot: 1200, cosPhi: 1 },
   { id: 'quarto', nome: 'Quarto / Suíte', categoria: 'essenciais', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
@@ -1213,7 +1237,137 @@ const AMBIENTES = [
   { id: 'equipamentos-av', nome: 'Equipamentos de Áudio e Vídeo', categoria: 'automacao', tipo: 'forca', dr: false, pot: 500, cosPhi: 0.9 },
   { id: 'nobreak-automacao', nome: 'Nobreak da Automação', categoria: 'automacao', tipo: 'forca', dr: false, pot: 400, cosPhi: 0.9 },
 
-  { id: 'outro', nome: 'Outro / Personalizado', categoria: 'outros', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
+  { id: 'outro-residencial', nome: 'Outro / Personalizado', categoria: 'outros', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
+];
+
+// Atividade apenas prioriza a leitura do relatório — não restringe quais circuitos podem
+// ser adicionados (item 11 do escopo: "não impedir inclusões").
+const ATIVIDADES_COMERCIAIS = [
+  'Escritório', 'Loja', 'Mercado', 'Supermercado', 'Restaurante', 'Bar', 'Hotel', 'Pousada',
+  'Clínica', 'Consultório', 'Hospital', 'Escola', 'Faculdade', 'Academia', 'Salão de beleza',
+  'Oficina', 'Posto de combustível', 'Data center', 'Condomínio comercial', 'Shopping',
+  'Estacionamento', 'Outro',
+];
+
+const AMBIENTES_COMERCIAL = [
+  // Circuitos comerciais gerais
+  { id: 'com-iluminacao-interna', nome: 'Iluminação Interna', categoria: 'com-gerais', tipo: 'iluminacao', dr: false, pot: 800, cosPhi: 0.95 },
+  { id: 'com-iluminacao-externa-estacionamento', nome: 'Iluminação Externa / Estacionamento', categoria: 'com-gerais', tipo: 'iluminacao', dr: true, pot: 1000, cosPhi: 0.95 },
+  { id: 'com-iluminacao-decorativa-vitrine', nome: 'Iluminação Decorativa / Vitrine / Fachada', categoria: 'com-gerais', tipo: 'iluminacao', dr: false, pot: 500, cosPhi: 0.95 },
+  { id: 'com-letreiro', nome: 'Letreiro / Luminoso', categoria: 'com-gerais', tipo: 'forca', dr: false, pot: 600, cosPhi: 0.9 },
+  { id: 'com-iluminacao-emergencia', nome: 'Iluminação de Emergência', categoria: 'com-gerais', tipo: 'iluminacao', dr: false, pot: 60, cosPhi: 0.95, seguranca: true },
+  { id: 'com-tomadas-gerais', nome: 'Tomadas Gerais / Administrativas', categoria: 'com-gerais', tipo: 'forca', dr: true, pot: 1500, cosPhi: 1 },
+  { id: 'com-tomadas-atendimento', nome: 'Tomadas de Atendimento / Balcão / Caixa', categoria: 'com-gerais', tipo: 'forca', dr: true, pot: 1200, cosPhi: 1 },
+  { id: 'com-copa-cozinha', nome: 'Copa / Cozinha — Tomadas', categoria: 'com-gerais', tipo: 'forca', dr: true, pot: 3000, cosPhi: 1 },
+  { id: 'com-banheiros', nome: 'Banheiros', categoria: 'com-gerais', tipo: 'forca', dr: true, pot: 1000, cosPhi: 1 },
+  { id: 'com-deposito', nome: 'Depósito / Almoxarifado', categoria: 'com-gerais', tipo: 'forca', dr: false, pot: 800, cosPhi: 1 },
+  { id: 'com-area-tecnica', nome: 'Área Técnica', categoria: 'com-gerais', tipo: 'forca', dr: false, pot: 1500, cosPhi: 0.9 },
+  { id: 'com-reserva-expansao', nome: 'Reserva para Expansão', categoria: 'com-gerais', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
+
+  // Climatização
+  { id: 'com-ar-split', nome: 'Ar-Condicionado Individual (Split)', categoria: 'com-climatizacao', tipo: 'forca', dr: false, pot: 2200, cosPhi: 0.85 },
+  { id: 'com-condensadora-chiller', nome: 'Condensadora / Chiller', categoria: 'com-climatizacao', tipo: 'forca', dr: false, pot: 15000, cosPhi: 0.85 },
+  { id: 'com-bomba-agua-gelada', nome: 'Bomba de Água Gelada', categoria: 'com-climatizacao', tipo: 'forca', dr: true, pot: 3000, cosPhi: 0.85 },
+  { id: 'com-torre-resfriamento', nome: 'Torre de Resfriamento', categoria: 'com-climatizacao', tipo: 'forca', dr: false, pot: 3700, cosPhi: 0.85 },
+  { id: 'com-fan-coil-vrf', nome: 'Fan Coil / VRF-VRV', categoria: 'com-climatizacao', tipo: 'forca', dr: false, pot: 1500, cosPhi: 0.85 },
+  { id: 'com-exaustao-sanitarios-cozinha', nome: 'Exaustão de Sanitários / Cozinha', categoria: 'com-climatizacao', tipo: 'forca', dr: false, pot: 500, cosPhi: 0.8 },
+  { id: 'com-insuflamento-pressurizacao', nome: 'Insuflamento / Pressurização de Escadas', categoria: 'com-climatizacao', tipo: 'forca', dr: false, pot: 1500, cosPhi: 0.8 },
+  { id: 'com-cortina-ar', nome: 'Cortina de Ar', categoria: 'com-climatizacao', tipo: 'forca', dr: false, pot: 1000, cosPhi: 0.85 },
+  { id: 'com-ventilacao-garagem', nome: 'Ventilação de Garagem', categoria: 'com-climatizacao', tipo: 'forca', dr: false, pot: 2200, cosPhi: 0.8 },
+
+  // Tecnologia e segurança
+  { id: 'com-servidores-rack', nome: 'Servidores / Rack de TI', categoria: 'com-tecnologia', tipo: 'forca', dr: false, pot: 1500, cosPhi: 0.9 },
+  { id: 'com-cftv-acesso', nome: 'CFTV / Controle de Acesso', categoria: 'com-tecnologia', tipo: 'forca', dr: false, pot: 300, cosPhi: 0.9 },
+  { id: 'com-alarme-bms', nome: 'Alarme / Automação Predial (BMS)', categoria: 'com-tecnologia', tipo: 'forca', dr: false, pot: 300, cosPhi: 0.9 },
+  { id: 'com-nobreak', nome: 'Nobreak', categoria: 'com-tecnologia', tipo: 'forca', dr: false, pot: 2000, cosPhi: 0.9 },
+  { id: 'com-quadro-cargas-criticas', nome: 'Quadro de Energia Estabilizada / Cargas Críticas', categoria: 'com-tecnologia', tipo: 'forca', dr: false, pot: 3000, cosPhi: 0.9 },
+
+  // Transporte
+  { id: 'com-elevador-social', nome: 'Elevador Social', categoria: 'com-transporte', tipo: 'forca', dr: true, pot: 7500, cosPhi: 0.8 },
+  { id: 'com-elevador-servico', nome: 'Elevador de Serviço', categoria: 'com-transporte', tipo: 'forca', dr: true, pot: 7500, cosPhi: 0.8 },
+  { id: 'com-escada-esteira-rolante', nome: 'Escada Rolante / Esteira Rolante', categoria: 'com-transporte', tipo: 'forca', dr: true, pot: 5500, cosPhi: 0.8 },
+  { id: 'com-porta-portao-cancela', nome: 'Porta Automática / Portão / Cancela', categoria: 'com-transporte', tipo: 'forca', dr: true, pot: 500, cosPhi: 0.8 },
+  { id: 'com-doca-niveladora', nome: 'Doca / Niveladora', categoria: 'com-transporte', tipo: 'forca', dr: true, pot: 2200, cosPhi: 0.8 },
+
+  // Bombeamento
+  { id: 'com-bomba-recalque-pressurizacao', nome: 'Bomba de Recalque / Pressurização', categoria: 'com-bombeamento', tipo: 'forca', dr: true, pot: 1500, cosPhi: 0.85 },
+  { id: 'com-bomba-drenagem-esgoto', nome: 'Bomba de Drenagem / Esgoto', categoria: 'com-bombeamento', tipo: 'forca', dr: true, pot: 750, cosPhi: 0.85 },
+  { id: 'com-bomba-incendio', nome: 'Bomba de Incêndio', categoria: 'com-bombeamento', tipo: 'forca', dr: false, pot: 7500, cosPhi: 0.85 },
+  { id: 'com-bomba-jockey', nome: 'Bomba Jockey', categoria: 'com-bombeamento', tipo: 'forca', dr: false, pot: 750, cosPhi: 0.85 },
+  { id: 'com-irrigacao', nome: 'Irrigação', categoria: 'com-bombeamento', tipo: 'forca', dr: true, pot: 500, cosPhi: 0.85 },
+
+  // Cozinha comercial
+  { id: 'com-forno-combinado', nome: 'Forno / Forno Combinado', categoria: 'com-cozinha', tipo: 'forca', dr: true, pot: 8000, cosPhi: 1 },
+  { id: 'com-fogao-chapa-fritadeira', nome: 'Fogão Elétrico / Chapa / Fritadeira', categoria: 'com-cozinha', tipo: 'forca', dr: true, pot: 6000, cosPhi: 1 },
+  { id: 'com-coifa-exaustor', nome: 'Coifa / Exaustor', categoria: 'com-cozinha', tipo: 'forca', dr: false, pot: 750, cosPhi: 0.8 },
+  { id: 'com-camara-fria-balcao', nome: 'Câmara Fria / Balcão Refrigerado', categoria: 'com-cozinha', tipo: 'forca', dr: false, pot: 2000, cosPhi: 0.85 },
+  { id: 'com-geladeira-freezer-industrial', nome: 'Geladeira / Freezer Industrial', categoria: 'com-cozinha', tipo: 'forca', dr: false, pot: 1500, cosPhi: 0.85 },
+  { id: 'com-maquina-gelo', nome: 'Máquina de Gelo', categoria: 'com-cozinha', tipo: 'forca', dr: false, pot: 1200, cosPhi: 0.85 },
+  { id: 'com-lava-loucas-industrial', nome: 'Lava-louças Industrial', categoria: 'com-cozinha', tipo: 'forca', dr: true, pot: 5000, cosPhi: 0.9 },
+  { id: 'com-maquina-cafe', nome: 'Máquina de Café', categoria: 'com-cozinha', tipo: 'forca', dr: true, pot: 2000, cosPhi: 0.98 },
+  { id: 'com-aquecimento-agua', nome: 'Aquecimento de Água (Boiler Comercial)', categoria: 'com-cozinha', tipo: 'forca', dr: true, pot: 6000, cosPhi: 1 },
+
+  // Cargas comerciais especiais
+  { id: 'com-equip-medicos-odonto', nome: 'Equipamentos Médicos / Odontológicos', categoria: 'com-especiais', tipo: 'forca', dr: true, pot: 1500, cosPhi: 0.9 },
+  { id: 'com-autoclave', nome: 'Autoclave', categoria: 'com-especiais', tipo: 'forca', dr: true, pot: 2000, cosPhi: 0.9 },
+  { id: 'com-raiox-laboratorio', nome: 'Raio-X / Equipamento Laboratorial', categoria: 'com-especiais', tipo: 'forca', dr: true, pot: 3000, cosPhi: 0.85 },
+  { id: 'com-maquinas-academia', nome: 'Máquinas de Academia', categoria: 'com-especiais', tipo: 'forca', dr: false, pot: 1500, cosPhi: 0.85 },
+  { id: 'com-equip-salao-beleza', nome: 'Equipamentos de Salão de Beleza', categoria: 'com-especiais', tipo: 'forca', dr: true, pot: 1500, cosPhi: 0.9 },
+  { id: 'com-lavadora-compressor', nome: 'Lavadora Profissional / Compressor', categoria: 'com-especiais', tipo: 'forca', dr: true, pot: 2200, cosPhi: 0.85 },
+  { id: 'com-ferramentas-oficina', nome: 'Ferramentas de Oficina', categoria: 'com-especiais', tipo: 'forca', dr: true, pot: 2000, cosPhi: 0.8 },
+  { id: 'com-elevador-automotivo', nome: 'Elevador Automotivo', categoria: 'com-especiais', tipo: 'forca', dr: true, pot: 3700, cosPhi: 0.8 },
+  { id: 'com-equip-audiovisual', nome: 'Equipamentos Audiovisuais', categoria: 'com-especiais', tipo: 'forca', dr: false, pot: 800, cosPhi: 0.9 },
+
+  // Recarga veicular comercial
+  { id: 'com-carregador-ev-clientes', nome: 'Carregador Veicular — Clientes', categoria: 'com-ev', tipo: 'forca', dr: true, pot: 7400, cosPhi: 0.98 },
+  { id: 'com-carregador-ev-frota', nome: 'Carregador Veicular — Frota / Funcionários', categoria: 'com-ev', tipo: 'forca', dr: true, pot: 11000, cosPhi: 0.98 },
+
+  { id: 'outro-comercial', nome: 'Outro / Personalizado', categoria: 'outros', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
+];
+
+const AMBIENTES_CONDOMINIAL = [
+  // Segurança e acesso
+  { id: 'cond-portaria', nome: 'Portaria / Guarita', categoria: 'cond-seguranca', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
+  { id: 'cond-interfone-videoporteiro', nome: 'Interfone / Videoporteiro Central', categoria: 'cond-seguranca', tipo: 'forca', dr: false, pot: 300, cosPhi: 0.9 },
+  { id: 'cond-cftv', nome: 'CFTV das Áreas Comuns', categoria: 'cond-seguranca', tipo: 'forca', dr: false, pot: 300, cosPhi: 0.9 },
+  { id: 'cond-controle-acesso', nome: 'Controle de Acesso (Catraca / Cancela)', categoria: 'cond-seguranca', tipo: 'forca', dr: true, pot: 500, cosPhi: 0.85 },
+  { id: 'cond-alarme', nome: 'Alarme das Áreas Comuns', categoria: 'cond-seguranca', tipo: 'forca', dr: false, pot: 150, cosPhi: 0.9 },
+  { id: 'cond-cerca-eletrica', nome: 'Cerca Elétrica', categoria: 'cond-seguranca', tipo: 'forca', dr: true, pot: 150, cosPhi: 0.9 },
+  { id: 'cond-iluminacao-emergencia', nome: 'Iluminação de Emergência das Áreas Comuns', categoria: 'cond-seguranca', tipo: 'iluminacao', dr: false, pot: 60, cosPhi: 0.95, seguranca: true },
+
+  // Áreas de lazer e convivência
+  { id: 'cond-iluminacao-hall-escadas', nome: 'Iluminação de Hall / Corredores / Escadas', categoria: 'cond-lazer', tipo: 'iluminacao', dr: false, pot: 800, cosPhi: 0.95 },
+  { id: 'cond-iluminacao-externa-jardim', nome: 'Iluminação Externa / Jardim', categoria: 'cond-lazer', tipo: 'iluminacao', dr: true, pot: 1000, cosPhi: 0.95 },
+  { id: 'cond-salao-festas', nome: 'Salão de Festas — Iluminação e Tomadas', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 3000, cosPhi: 1 },
+  { id: 'cond-academia', nome: 'Academia do Condomínio', categoria: 'cond-lazer', tipo: 'forca', dr: false, pot: 2000, cosPhi: 0.85 },
+  { id: 'cond-playground-quadra', nome: 'Playground / Quadra — Iluminação', categoria: 'cond-lazer', tipo: 'iluminacao', dr: true, pot: 600, cosPhi: 0.95 },
+  { id: 'cond-gourmet', nome: 'Churrasqueira / Espaço Gourmet Comum', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 2000, cosPhi: 1 },
+  { id: 'cond-piscina-bomba', nome: 'Piscina do Condomínio — Bomba de Filtração', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 2200, cosPhi: 0.85 },
+  { id: 'cond-piscina-luz', nome: 'Piscina do Condomínio — Iluminação Subaquática', categoria: 'cond-lazer', tipo: 'iluminacao', dr: true, pot: 300, cosPhi: 0.95 },
+  { id: 'cond-piscina-aquecimento', nome: 'Piscina do Condomínio — Aquecimento', categoria: 'cond-lazer', tipo: 'forca', dr: true, pot: 4500, cosPhi: 1 },
+  { id: 'cond-lixo-compactador', nome: 'Sala de Lixo / Compactador', categoria: 'cond-lazer', tipo: 'forca', dr: false, pot: 1000, cosPhi: 0.85 },
+
+  // Elevadores e bombeamento
+  { id: 'cond-elevador-social', nome: 'Elevador Social', categoria: 'cond-elevadores', tipo: 'forca', dr: true, pot: 7500, cosPhi: 0.8 },
+  { id: 'cond-elevador-servico', nome: 'Elevador de Serviço', categoria: 'cond-elevadores', tipo: 'forca', dr: true, pot: 7500, cosPhi: 0.8 },
+  { id: 'cond-bomba-recalque', nome: 'Bomba de Recalque (Água)', categoria: 'cond-elevadores', tipo: 'forca', dr: true, pot: 2200, cosPhi: 0.85 },
+  { id: 'cond-bomba-incendio', nome: 'Bomba de Incêndio', categoria: 'cond-elevadores', tipo: 'forca', dr: false, pot: 7500, cosPhi: 0.85 },
+  { id: 'cond-bomba-jockey', nome: 'Bomba Jockey', categoria: 'cond-elevadores', tipo: 'forca', dr: false, pot: 750, cosPhi: 0.85 },
+  { id: 'cond-portao-cancela', nome: 'Portão Automático / Cancela Veicular', categoria: 'cond-elevadores', tipo: 'forca', dr: true, pot: 500, cosPhi: 0.8 },
+  { id: 'cond-casa-maquinas', nome: 'Casa de Máquinas / Motobomba', categoria: 'cond-elevadores', tipo: 'forca', dr: false, pot: 2000, cosPhi: 0.85 },
+  { id: 'cond-quadro-transferencia-gerador', nome: 'Quadro de Transferência do Gerador (quando existir)', categoria: 'cond-elevadores', tipo: 'forca', dr: false, pot: 1000, cosPhi: 0.9 },
+
+  // Recarga veicular (áreas comuns)
+  { id: 'cond-carregador-ev-condominos', nome: 'Carregador Veicular — Condôminos', categoria: 'cond-ev', tipo: 'forca', dr: true, pot: 7400, cosPhi: 0.98 },
+  { id: 'cond-quadro-recarga-dedicado', nome: 'Quadro Dedicado de Recarga (Áreas Comuns)', categoria: 'cond-ev', tipo: 'forca', dr: true, pot: 11000, cosPhi: 0.98 },
+
+  { id: 'outro-condominial', nome: 'Outro / Personalizado', categoria: 'outros', tipo: 'forca', dr: false, pot: 1000, cosPhi: 1 },
+];
+
+const AMBIENTES = [
+  ...AMBIENTES_RESIDENCIAL.map((a) => ({ ...a, perfil: 'residencial' })),
+  ...AMBIENTES_COMERCIAL.map((a) => ({ ...a, perfil: 'comercial' })),
+  ...AMBIENTES_CONDOMINIAL.map((a) => ({ ...a, perfil: 'condominial' })),
 ];
 
 const SERVICOS_NEXTOBRA = [
@@ -1228,11 +1382,15 @@ const SERVICOS_NEXTOBRA = [
 
 function popularAmbientes() {
   const sel = $('#ambiente');
-  Object.keys(CATEGORIAS_AMBIENTE).forEach((catId) => {
-    const itens = AMBIENTES.filter((a) => a.categoria === catId);
-    if (!itens.length) return;
+  sel.innerHTML = '';
+  const perfil = perfilAtual();
+  const itensPerfil = AMBIENTES.filter((a) => a.perfil === perfil);
+  const categoriasUsadas = [];
+  itensPerfil.forEach((a) => { if (!categoriasUsadas.includes(a.categoria)) categoriasUsadas.push(a.categoria); });
+  categoriasUsadas.forEach((catId) => {
+    const itens = itensPerfil.filter((a) => a.categoria === catId);
     const grupo = document.createElement('optgroup');
-    grupo.label = CATEGORIAS_AMBIENTE[catId];
+    grupo.label = CATEGORIAS_AMBIENTE[catId] || catId;
     itens.forEach((a) => {
       const opt = document.createElement('option');
       opt.value = a.id; opt.textContent = a.nome;
@@ -1290,6 +1448,11 @@ const AUTO_BINARIAS_LISTA = [
   { id: 'documentacao', label: 'Existe documentação dos dispositivos?' },
 ];
 
+function popularAtividadesComerciais() {
+  const sel = $('#com-atividade');
+  sel.innerHTML = '<option value="">—</option>' + ATIVIDADES_COMERCIAIS.map((a) => `<option value="${a}">${a}</option>`).join('');
+}
+
 function popularDocumentosSituacao() {
   $('#sp-documentos').innerHTML = SP_DOCUMENTOS.map((d, i) => `<label class="chip"><input type="checkbox" name="spDocumento" value="${i}">${d}</label>`).join('');
 }
@@ -1322,16 +1485,13 @@ function atualizarVisibilidadeSolucaoNeutro() {
 let perfilAnterior = 'residencial';
 function atualizarVisibilidadePerfil() {
   const perfil = document.querySelector('input[name="perfilInstalacao"]:checked').value;
-  const ehResidencial = perfil === 'residencial';
-  $('#perfil-indisponivel').style.display = ehResidencial ? 'none' : '';
-  $('#painel-form-circuito').style.display = ehResidencial ? '' : 'none';
-  $('#painel-circuitos').style.display = ehResidencial ? '' : 'none';
-  $('#painel-automacao').style.display = ehResidencial ? '' : 'none';
+  $('#painel-automacao').style.display = perfil === 'residencial' ? '' : 'none';
+  $('#row-atividade-comercial').style.display = perfil === 'comercial' ? '' : 'none';
 }
 function onChangePerfil() {
   const novo = document.querySelector('input[name="perfilInstalacao"]:checked').value;
   if (novo !== perfilAnterior && circuitos.length > 0) {
-    const ok = confirm('Trocar o perfil da instalação não apaga os circuitos já cadastrados, mas eles ficam ocultos até você voltar para o perfil Residencial. Deseja continuar?');
+    const ok = confirm('Trocar o perfil da instalação muda a biblioteca de ambientes oferecida para novos circuitos, mas não apaga os circuitos já cadastrados no quadro. Deseja continuar?');
     if (!ok) {
       document.querySelector(`input[name="perfilInstalacao"][value="${perfilAnterior}"]`).checked = true;
       return;
@@ -1339,6 +1499,10 @@ function onChangePerfil() {
   }
   perfilAnterior = novo;
   atualizarVisibilidadePerfil();
+  popularAmbientes();
+  $('#descricao').dataset.tocado = '';
+  aplicarAmbiente();
+  render();
 }
 
 function lerProjeto() {
@@ -1359,6 +1523,7 @@ function lerProjeto() {
       observacoes: $('#sp-observacoes').value, pendencias: $('#sp-pendencias').value,
     },
     perfil: (document.querySelector('input[name="perfilInstalacao"]:checked') || {}).value || 'residencial',
+    atividadeComercial: $('#com-atividade').value,
     automacao: {
       casaInteligente: $('#auto-casa-inteligente').value,
       usaAlexa: $('#auto-usa-alexa').value,
@@ -1400,6 +1565,8 @@ function aplicarProjeto(p) {
   const radioPerfil = document.querySelector(`input[name="perfilInstalacao"][value="${p.perfil || 'residencial'}"]`);
   if (radioPerfil) radioPerfil.checked = true;
   perfilAnterior = p.perfil || 'residencial';
+  $('#com-atividade').value = p.atividadeComercial || '';
+  popularAmbientes();
 
   const au = p.automacao || {};
   $('#auto-casa-inteligente').value = au.casaInteligente || 'nao';
@@ -2011,6 +2178,7 @@ function fichaTecnicaHTML() {
       ${linha('Concessionária', id.concessionaria)}
       ${linha('Tipo de obra', LABEL_TIPO_OBRA[id.tipoObra])}
       ${linha('Perfil da instalação', LABEL_PERFIL[p.perfil])}
+      ${linha('Atividade comercial', p.atividadeComercial)}
       ${linha('Tipo de entrada de serviço', LABEL_TIPO_ENTRADA[id.tipoEntrada])}
       ${linha('Responsável técnico', id.responsavel)}
       ${linha('Data', id.data)}
@@ -2129,6 +2297,7 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
 
 popularAmbientes();
 popularServicos();
+popularAtividadesComerciais();
 popularDocumentosSituacao();
 popularAutoServicos();
 popularAutoPontos();
@@ -2136,8 +2305,8 @@ popularAutoBinarias();
 popularTensoes();
 atualizarModo();
 atualizarLabelTemp();
-aplicarAmbiente();
 carregarProjeto();
+aplicarAmbiente();
 atualizarVisibilidadeAutomacao();
 atualizarVisibilidadeSolucaoNeutro();
 atualizarVisibilidadePerfil();
