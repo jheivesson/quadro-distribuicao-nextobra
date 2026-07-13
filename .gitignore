@@ -1,0 +1,23 @@
+# Netlify (estado local)
+.netlify/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.temp
+
+# IDEs
+.vscode/
+.idea/
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.*
