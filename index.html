@@ -460,14 +460,15 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
 
   /* Nada pode ter largura fixa maior que a página impressa — diagrama e tabelas largas
      precisam encolher pra caber, nunca estourar (senão o PDF sai cortado/inválido). */
-  /* Sem break-inside:avoid aqui de propósito: num quadro com muitos circuitos o diagrama
-     fica mais alto que uma página inteira, e "avoid" só desperdiça uma página em branco
-     tentando (e falhando) empurrar tudo pra página seguinte. Deixar quebrar naturalmente
-     é pior visualmente (pode cortar uma linha de disjuntores ao meio) mas nunca fica com
-     conteúdo faltando ou página em branco. Borda arredondada removida no modo impressão —
-     uma caixa com border-radius que precisa fragmentar entre páginas pode deixar uma
-     página "fantasma" só com o fundo, sem o conteúdo, no Chrome. */
-  .diagrama-container { overflow: visible !important; max-width: 100%; padding: 10px; border-radius: 0; border: none; background: none; }
+  /* break-inside:avoid agora é seguro aqui (Sprint PDF-001): gerarSVGQuadro() garante que
+     nenhum bloco de gabinete passa de ALTURA_MAX_BLOCO_PX (menor que uma página impressa
+     inteira), dividindo quadros grandes em múltiplos blocos/gabinetes menores antes de
+     desenhar. Como cada bloco sempre cabe inteiro numa página, "avoid" só empurra o bloco
+     inteiro pra página seguinte quando necessário — nunca fica sem espaço, então nunca gera
+     página em branco nem corta uma linha de disjuntores ao meio (o problema antigo só
+     existia quando um único diagrama gigante podia ser mais alto que a própria página).
+     Borda arredondada continua removida no modo impressão por segurança adicional. */
+  .diagrama-container { overflow: visible !important; max-width: 100%; padding: 10px; border-radius: 0; border: none; background: none; break-inside: avoid; }
   /* Não force width:100% aqui — o SVG já tem width="100%" + max-width:${W}px inline, que
      encolhe corretamente até o tamanho natural do diagrama. Forçar width:100% no modo
      impressão estica diagramas pequenos ao tamanho da página inteira e, em diagramas com
@@ -2823,7 +2824,7 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
   const rows = [];
   rows.push({
     devices: [
-      { kind: 'geral', mods: geralPolos >= 4 ? 4 : 2, l1: `${disjuntorGeral ?? '—'}A`, l2: rotuloGeral },
+      { kind: 'geral', mods: geralPolos >= 4 ? 4 : 2, l1: `${disjuntorGeral !== null ? disjuntorGeral : '>' + DISJUNTORES[DISJUNTORES.length - 1]}A`, l2: rotuloGeral },
       { kind: 'dps', mods: 2, l1: 'DPS', l2: 'CLASSE II' },
     ],
   });
@@ -2832,7 +2833,7 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
     const somaIbGrupo = grupo.reduce((s, c) => s + c.resultado.ib, 0);
     const idrPolos = grupo.some((c) => c.params.sistema === 'trifasico') ? 4 : 2;
     const idr = escolherIDR(somaIbGrupo);
-    const devices = [{ kind: 'idr', mods: idrPolos, l1: `${idr ?? '—'}A`, l2: `IDR-${gi + 1} 30mA` }];
+    const devices = [{ kind: 'idr', mods: idrPolos, l1: `${idr !== null ? idr : '>' + DR_RATINGS[DR_RATINGS.length - 1]}A`, l2: `IDR-${gi + 1} 30mA` }];
     grupo.forEach((c) => {
       const polos = c.params.sistema === 'trifasico' ? 3 : 1;
       devices.push({ kind: 'breaker', mods: polos, l1: `${c.resultado.inom}A`, l2: `C${numeroPorId.get(c.id)}`, titulo: c.descricao, conforme: c.resultado.conforme });
@@ -2866,41 +2867,85 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
   const innerW = maxMods * MOD_W;
   const W = innerW + PAD * 2 + 30;
   const faseBarsHeight = fases.length * 14 + Math.max(0, fases.length - 1) * 4;
-  const H = PAD * 2 + TITLE_H + faseBarsHeight + 10 + 34 + rows.length * (MOD_H + ROW_GAP) + 34 + CAPTION_H;
 
-  // width/height explícitos (além do viewBox) dão ao navegador uma proporção intrínseca
-  // confiável — sem eles, o pipeline de impressão/PDF do Chrome pode calcular a altura
-  // errada e encolher todo o conteúdo interno a quase nada, sobrando só o fundo do painel.
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%; max-width:${W}px; height:auto;" xmlns="http://www.w3.org/2000/svg">`;
-  svg += svgGabinete(1, 1, W - 2, H - 2, { titulo: tituloGabinete, badgeTipoEntrada, legendaCapacidade });
+  // Altura de um gabinete com N linhas de dispositivos — mesma fórmula usada tanto para
+  // decidir onde cortar em blocos quanto para desenhar cada bloco.
+  function alturaGabinete(numRows) {
+    return PAD * 2 + TITLE_H + faseBarsHeight + 10 + 34 + numRows * (MOD_H + ROW_GAP) + 34 + CAPTION_H;
+  }
 
-  let y = PAD + TITLE_H;
-  const faseBars = svgFaseBars(PAD + 30, y, innerW - 30, fases);
-  svg += faseBars.svg;
-  y += faseBars.height + 10;
-  svg += svgTerminalBar(PAD + 30, y, innerW - 30, '#2b6cb5', 'N');
-  y += 34;
+  // Um único gabinete ilustrativo nunca pode representar fisicamente mais módulos do que o
+  // maior gabinete comercial real (72, o maior valor de QUADRO_TAMANHOS) — e nunca pode ser
+  // alto demais para caber inteiro numa página impressa (297x210mm, margem 12mm, @page —
+  // ~703px úteis a 96dpi; usamos uma folga de segurança abaixo disso). Por isso as linhas já
+  // calculadas são divididas em blocos, cada um virando seu próprio gabinete com cabeçalho,
+  // barras de fase, barramento N/PE e legenda de capacidade próprios — sem duplicar nenhum
+  // circuito e sem recalcular nada do motor NBR 5410 (só reagrupa o que `rows` já contém).
+  const MODULOS_MAX_POR_BLOCO = QUADRO_TAMANHOS[QUADRO_TAMANHOS.length - 1];
+  const ALTURA_MAX_BLOCO_PX = 650;
 
+  const blocosDeLinhas = [];
+  let blocoAtual = [];
+  let modulosBlocoAtual = 0;
   rows.forEach((row) => {
     const rowMods = row.devices.reduce((s, d) => s + d.mods, 0);
-    const rowW = rowMods * MOD_W;
-    const railX = PAD + (innerW - rowW) / 2 - 12;
-    svg += svgRail(railX, y + MOD_H * 0.32, rowW + 24);
-    let x = PAD + (innerW - rowW) / 2;
-    row.devices.forEach((d) => {
-      const w = d.mods * MOD_W - 6;
-      if (d.kind === 'breaker') svg += svgBreaker(x, y, w, MOD_H, d.l1, d.l2, d.conforme, d.titulo);
-      else if (d.kind === 'idr') svg += svgRCD(x, y, w, MOD_H, d.l1, d.l2);
-      else if (d.kind === 'geral') svg += svgBreaker(x, y, w, MOD_H, d.l1, d.l2, true, null);
-      else if (d.kind === 'dps') svg += svgDPS(x, y, w, MOD_H, d.l1, d.l2);
-      x += d.mods * MOD_W;
+    const excederiaModulos = modulosBlocoAtual + rowMods > MODULOS_MAX_POR_BLOCO;
+    const excederiaAltura = alturaGabinete(blocoAtual.length + 1) > ALTURA_MAX_BLOCO_PX;
+    if (blocoAtual.length > 0 && (excederiaModulos || excederiaAltura)) {
+      blocosDeLinhas.push(blocoAtual);
+      blocoAtual = [];
+      modulosBlocoAtual = 0;
+    }
+    blocoAtual.push(row);
+    modulosBlocoAtual += rowMods;
+  });
+  if (blocoAtual.length) blocosDeLinhas.push(blocoAtual);
+
+  const totalBlocos = blocosDeLinhas.length;
+
+  const blocos = blocosDeLinhas.map((linhasDoBloco, blocoIdx) => {
+    const modulosBloco = linhasDoBloco.reduce((s, r) => s + r.devices.reduce((s2, d) => s2 + d.mods, 0), 0);
+    const capacidadeBloco = escolherQuadro(modulosBloco);
+    const H = alturaGabinete(linhasDoBloco.length);
+    const tituloBloco = totalBlocos > 1 ? `${tituloGabinete} — Bloco ${blocoIdx + 1} de ${totalBlocos}` : tituloGabinete;
+    const legendaBloco = `Capacidade do gabinete: ${capacidadeBloco ?? `≥ ${modulosBloco}`} módulos DIN (${modulosBloco} ocupado${modulosBloco === 1 ? '' : 's'})`;
+
+    // width/height explícitos (além do viewBox) dão ao navegador uma proporção intrínseca
+    // confiável — sem eles, o pipeline de impressão/PDF do Chrome pode calcular a altura
+    // errada e encolher todo o conteúdo interno a quase nada, sobrando só o fundo do painel.
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%; max-width:${W}px; height:auto;" xmlns="http://www.w3.org/2000/svg">`;
+    svg += svgGabinete(1, 1, W - 2, H - 2, { titulo: tituloBloco, badgeTipoEntrada, legendaCapacidade: legendaBloco });
+
+    let y = PAD + TITLE_H;
+    const faseBars = svgFaseBars(PAD + 30, y, innerW - 30, fases);
+    svg += faseBars.svg;
+    y += faseBars.height + 10;
+    svg += svgTerminalBar(PAD + 30, y, innerW - 30, '#2b6cb5', 'N');
+    y += 34;
+
+    linhasDoBloco.forEach((row) => {
+      const rowMods = row.devices.reduce((s, d) => s + d.mods, 0);
+      const rowW = rowMods * MOD_W;
+      const railX = PAD + (innerW - rowW) / 2 - 12;
+      svg += svgRail(railX, y + MOD_H * 0.32, rowW + 24);
+      let x = PAD + (innerW - rowW) / 2;
+      row.devices.forEach((d) => {
+        const w = d.mods * MOD_W - 6;
+        if (d.kind === 'breaker') svg += svgBreaker(x, y, w, MOD_H, d.l1, d.l2, d.conforme, d.titulo);
+        else if (d.kind === 'idr') svg += svgRCD(x, y, w, MOD_H, d.l1, d.l2);
+        else if (d.kind === 'geral') svg += svgBreaker(x, y, w, MOD_H, d.l1, d.l2, true, null);
+        else if (d.kind === 'dps') svg += svgDPS(x, y, w, MOD_H, d.l1, d.l2);
+        x += d.mods * MOD_W;
+      });
+      y += MOD_H + ROW_GAP;
     });
-    y += MOD_H + ROW_GAP;
+
+    svg += svgTerminalBar(PAD + 30, y, innerW - 30, '#2f9e5b', 'PE');
+    svg += `</svg>`;
+    return { svg, titulo: tituloBloco, modulos: modulosBloco };
   });
 
-  svg += svgTerminalBar(PAD + 30, y, innerW - 30, '#2f9e5b', 'PE');
-  svg += `</svg>`;
-  return { svg, disjuntorGeral, geralPolos, somaIbGeral, tipoEntrada };
+  return { blocos, totalBlocos, disjuntorGeral, geralPolos, somaIbGeral, tipoEntrada };
 }
 
 function escaparXML(str) {
@@ -3138,12 +3183,17 @@ function detectarSubQuadros(lista) {
 }
 
 function subQuadroHTML(titulo, lista, tipoEntrada, idSufixo) {
-  const { svg, disjuntorGeral, geralPolos } = gerarSVGQuadro(lista, tipoEntrada, idSufixo);
+  const { blocos, disjuntorGeral, geralPolos } = gerarSVGQuadro(lista, tipoEntrada, idSufixo);
   const bom = gerarBOMConsolidada(lista, { disjuntorGeral, geralPolos });
+  const diagramaHTML = blocos.map((b) => `<div class="diagrama-container">${b.svg}</div>`).join('');
+  const avisoDivisao = blocos.length > 1
+    ? `<div class="field-hint" style="margin-bottom:8px;">Este sub-quadro foi dividido em ${blocos.length} blocos ilustrativos para fins de documentação técnica — a divisão física real deve ser validada no projeto executivo.</div>`
+    : '';
   return `
     <div class="bom-group-title">${titulo}</div>
     <div class="field-hint" style="margin-bottom:8px;">Alimentador dedicado a partir do quadro geral · Disjuntor de entrada ${geralPolos >= 4 ? 'tetrapolar' : 'bipolar'} ${disjuntorGeral ?? '—'} A · ${lista.length} circuito${lista.length === 1 ? '' : 's'}</div>
-    <div class="diagrama-container">${svg}</div>
+    ${avisoDivisao}
+    ${diagramaHTML}
     ${detalhesTecnicosHTML(lista)}
     ${bomTableHTML('Proteção do sub-quadro', bom.grupoProtecao)}
     ${bomTableHTML('Disjuntores dos circuitos', bom.grupoDisjuntores)}
@@ -3158,9 +3208,13 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
   if (circuitos.length === 0) return;
   const projetoAtual = lerProjeto();
   const tipoEntrada = projetoAtual.identificacao.tipoEntrada;
-  const { svg, disjuntorGeral, geralPolos, somaIbGeral } = gerarSVGQuadro(circuitos, tipoEntrada, 'geral');
+  const { blocos, disjuntorGeral, geralPolos, somaIbGeral } = gerarSVGQuadro(circuitos, tipoEntrada, 'geral');
   const bom = gerarBOMConsolidada(circuitos, { disjuntorGeral, geralPolos });
   const legendaQuadro = `<div class="field-hint" style="margin-bottom:8px;">Quadro — ${LABEL_PERFIL[projetoAtual.perfil] || 'Residencial'} · Entrada ${LABEL_TIPO_ENTRADA[tipoEntrada]} · Disjuntor geral ${geralPolos >= 4 ? 'tetrapolar' : 'bipolar'} ${disjuntorGeral ?? '—'} A · o número em cada disjuntor (C1, C2…) corresponde à linha "Nº" da tabela de detalhamento técnico logo abaixo</div>`;
+  const diagramaHTML = blocos.map((b) => `<div class="diagrama-container">${b.svg}</div>`).join('');
+  const avisoDivisaoBlocos = blocos.length > 1
+    ? `<div class="field-hint" style="margin-bottom:8px;">Este quadro foi dividido em ${blocos.length} blocos ilustrativos para fins de documentação técnica — a divisão física real do(s) quadro(s) deve ser validada no projeto executivo.</div>`
+    : '';
 
   const totalConforme = circuitos.filter((c) => c.resultado.conforme).length;
   const todosConformes = totalConforme === circuitos.length;
@@ -3178,7 +3232,8 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
     ${fichaTecnicaHTML()}
     ${veredictoGeral}
     ${legendaQuadro}
-    <div class="diagrama-container">${svg}</div>
+    ${avisoDivisaoBlocos}
+    ${diagramaHTML}
     ${detalhesTecnicosHTML(circuitos)}
     ${bomTableHTML('Proteção geral', bom.grupoProtecao)}
     ${bomTableHTML('Disjuntores dos circuitos', bom.grupoDisjuntores)}
@@ -3205,12 +3260,15 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
     // janela de impressão para Paisagem só porque o CSS pede; é uma preferência que fica
     // com o usuário. Isso garante que a instrução seja vista toda vez, antes da janela abrir.
     alert(
-      'ANTES DE SALVAR O PDF:\n\n' +
-      'Na janela de impressão que vai abrir agora, procure o campo "Layout" ou "Orientação" ' +
-      '(geralmente logo abaixo do nome da impressora) e confira se está em "Paisagem" (Horizontal).\n\n' +
-      'Se estiver em "Retrato", troque para "Paisagem" antes de clicar em Salvar — este relatório ' +
-      'é largo (tabela técnica e desenho do quadro) e sai cortado/errado em retrato.\n\n' +
-      'Se não aparecer a opção de primeira, clique em "Mais configurações" na janela de impressão.'
+      'ANTES DE SALVAR O PDF, na janela de impressão que vai abrir agora:\n\n' +
+      '1) Layout/Orientação: escolha "Paisagem" (Horizontal) — o relatório é largo e sai ' +
+      'cortado/errado em retrato.\n\n' +
+      '2) Desmarque a opção "Cabeçalhos e rodapés" — sem isso o navegador imprime data, ' +
+      'endereço do arquivo e número de página em cima do relatório.\n\n' +
+      '3) Escala: mantenha em "Padrão" (100%); só ajuste se algum conteúdo aparecer cortado ' +
+      'na prévia.\n\n' +
+      '4) Confirme "Salvar como PDF" no destino/impressora antes de clicar em Salvar.\n\n' +
+      'Se alguma dessas opções não aparecer de primeira, clique em "Mais configurações" na janela de impressão.'
     );
     window.print();
   });
