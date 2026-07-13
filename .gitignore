@@ -21,3 +21,4 @@ desktop.ini
 .env
 .env.local
 .env.*
+!.env.example
