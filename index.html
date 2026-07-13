@@ -2715,7 +2715,18 @@ function svgDPS(x, y, w, h, label1, label2) {
 }
 
 function svgRail(x, y, w) {
-  return `<rect x="${x}" y="${y}" width="${w}" height="7" rx="1.5" fill="#c3cad0" stroke="#8b959c" stroke-width="0.6"/>`;
+  // Sombra de encaixe (reaproveita svgSombraFalsa, já validada contra o bug de
+  // impressão) + realce superior em duas camadas + perfurações — só cores
+  // sólidas/opacity, nunca gradiente/filtro via url().
+  let s = svgSombraFalsa(x, y, w, 7, 1.5);
+  s += `<rect x="${x}" y="${y}" width="${w}" height="7" rx="1.5" fill="#c3cad0" stroke="#8b959c" stroke-width="0.6"/>`;
+  s += `<rect x="${x}" y="${y}" width="${w}" height="2.6" rx="1.2" fill="#e6eaed" opacity="0.75"/>`;
+  const furos = Math.max(3, Math.round(w / 60));
+  for (let i = 0; i < furos; i++) {
+    const cx = x + (w / furos) * (i + 0.5);
+    s += `<rect x="${cx - 2.5}" y="${y + 1.8}" width="5" height="3.4" rx="0.8" fill="#8b959c" opacity="0.5"/>`;
+  }
+  return s;
 }
 
 // Cores de fase — a NBR 5410 exige apenas que as fases sejam distinguíveis entre si e do
@@ -2756,6 +2767,39 @@ function svgTerminalBar(x, y, w, color, label) {
   return s;
 }
 
+// Gabinete do quadro — contorno externo, moldura interna e área útil, mais o
+// título genérico (derivado só do tipo de entrada) e a legenda de capacidade em
+// módulos. Só cores sólidas (fill/stroke), nunca gradiente/filtro via url() — o
+// mesmo cuidado já documentado em svgSombraFalsa() para não quebrar no PDF.
+function svgGabinete(x, y, w, h, opts) {
+  opts = opts || {};
+  // Badge do tipo de entrada em azul institucional (--blue: #1f6fa8 / --blue-tint:
+  // #eaf2f8, os mesmos tokens já usados no resto da plataforma) — largura calculada
+  // pelo comprimento do texto, nunca fixa, para caber "ENTRADA MONOFÁSICA/BIFÁSICA/
+  // TRIFÁSICA" sem estourar.
+  const BADGE_H = 16, BADGE_PAD_X = 12, BADGE_CHAR_W = 5.6;
+  let s = '<g>';
+  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="#eef1f3" stroke="#c7d0d8" stroke-width="1.5"/>`;
+  s += `<rect x="${x + 8}" y="${y + 8}" width="${w - 16}" height="${h - 16}" rx="10" fill="#e5e9ec" stroke="#c7d0d8" stroke-width="1"/>`;
+  s += `<rect x="${x + 18}" y="${y + 18}" width="${w - 36}" height="${h - 36}" rx="7" fill="#f7f8f8" stroke="#dde2e5" stroke-width="1"/>`;
+  if (opts.titulo) {
+    s += `<text x="${x + w / 2}" y="${y + 24}" text-anchor="middle" font-size="11" font-weight="700" fill="#16202c" font-family="JetBrains Mono, monospace">${escaparXML(opts.titulo)}</text>`;
+  }
+  if (opts.badgeTipoEntrada) {
+    const texto = opts.badgeTipoEntrada;
+    const badgeW = texto.length * BADGE_CHAR_W + BADGE_PAD_X * 2;
+    const badgeX = x + w / 2 - badgeW / 2;
+    const badgeY = y + 30;
+    s += `<rect x="${badgeX}" y="${badgeY}" width="${badgeW}" height="${BADGE_H}" rx="${BADGE_H / 2}" fill="#eaf2f8" stroke="#1f6fa8" stroke-width="1"/>`;
+    s += `<text x="${x + w / 2}" y="${badgeY + BADGE_H / 2 + 3.2}" text-anchor="middle" font-size="8.2" font-weight="700" fill="#1f6fa8" font-family="JetBrains Mono, monospace">${escaparXML(texto)}</text>`;
+  }
+  if (opts.legendaCapacidade) {
+    s += `<text x="${x + w / 2}" y="${y + h - 10}" text-anchor="middle" font-size="9.5" fill="#55636f" font-family="-apple-system, sans-serif">${escaparXML(opts.legendaCapacidade)}</text>`;
+  }
+  s += '</g>';
+  return s;
+}
+
 function gerarSVGQuadro(circuitos, tipoEntrada) {
   tipoEntrada = FASES_POR_ENTRADA[tipoEntrada] ? tipoEntrada : 'monofasica';
   const semDR = circuitos.filter((c) => !c.exigeDR);
@@ -2769,6 +2813,7 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
   const rotuloGeral = { monofasica: 'GERAL MONO', bifasica: 'GERAL BI', trifasica: 'GERAL TRI' }[tipoEntrada];
 
   const MOD_W = 52, MOD_H = 78, ROW_GAP = 44, PAD = 30, ROW_CAP = 8;
+  const TITLE_H = 34, CAPTION_H = 20;
 
   // Cada disjuntor mostra o número do circuito (mesma numeração da tabela de detalhamento
   // técnico) em vez do nome truncado — evita nomes cortados feios e é como painéis reais
@@ -2804,20 +2849,32 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
   });
   if (atual.length) rows.push({ devices: atual });
 
+  // Capacidade em módulos do gabinete — soma dos módulos já desenhados nas linhas
+  // acima e reaproveita o mesmo escolherQuadro()/QUADRO_TAMANHOS já usado na lista
+  // de materiais (não duplica cálculo nenhum, só lê o total aqui também).
+  const totalModulosOcupados = rows.reduce((s, r) => s + r.devices.reduce((s2, d) => s2 + d.mods, 0), 0);
+  const capacidadeGabinete = escolherQuadro(totalModulosOcupados);
+  const tituloGabinete = 'QUADRO DE DISTRIBUIÇÃO';
+  const badgeTipoEntrada = {
+    monofasica: 'ENTRADA MONOFÁSICA',
+    bifasica: 'ENTRADA BIFÁSICA',
+    trifasica: 'ENTRADA TRIFÁSICA',
+  }[tipoEntrada];
+  const legendaCapacidade = `Capacidade do gabinete: ${capacidadeGabinete ?? `≥ ${totalModulosOcupados}`} módulos DIN (${totalModulosOcupados} ocupado${totalModulosOcupados === 1 ? '' : 's'})`;
+
   const maxMods = Math.max(...rows.map((r) => r.devices.reduce((s, d) => s + d.mods, 0)));
   const innerW = maxMods * MOD_W;
   const W = innerW + PAD * 2 + 30;
   const faseBarsHeight = fases.length * 14 + Math.max(0, fases.length - 1) * 4;
-  const H = PAD * 2 + faseBarsHeight + 10 + 34 + rows.length * (MOD_H + ROW_GAP) + 34;
+  const H = PAD * 2 + TITLE_H + faseBarsHeight + 10 + 34 + rows.length * (MOD_H + ROW_GAP) + 34 + CAPTION_H;
 
   // width/height explícitos (além do viewBox) dão ao navegador uma proporção intrínseca
   // confiável — sem eles, o pipeline de impressão/PDF do Chrome pode calcular a altura
   // errada e encolher todo o conteúdo interno a quase nada, sobrando só o fundo do painel.
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%; max-width:${W}px; height:auto;" xmlns="http://www.w3.org/2000/svg">`;
-  svg += `<rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="14" fill="#eef1f3" stroke="#c7d0d8" stroke-width="1.5"/>`;
-  svg += `<rect x="9" y="9" width="${W - 18}" height="${H - 18}" rx="9" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.7"/>`;
+  svg += svgGabinete(1, 1, W - 2, H - 2, { titulo: tituloGabinete, badgeTipoEntrada, legendaCapacidade });
 
-  let y = PAD;
+  let y = PAD + TITLE_H;
   const faseBars = svgFaseBars(PAD + 30, y, innerW - 30, fases);
   svg += faseBars.svg;
   y += faseBars.height + 10;
