@@ -613,9 +613,6 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
           <span class="field-hint">Usada como referência no relatório — não restringe quais circuitos podem ser adicionados ao quadro.</span>
         </div>
       </div>
-      <div class="disclaimer" style="margin-top:16px;margin-bottom:0;">
-        <div>O módulo <strong>industrial</strong> fica de fora por enquanto: demanda dados de motores, partida e automação industrial que merecem um levantamento próprio, à parte deste documento.</div>
-      </div>
     </section>
 
     <section class="panel" id="painel-comodos">
@@ -1845,6 +1842,8 @@ $('#btn-add-comodos').addEventListener('click', () => {
       circuitos.push({
         id: proximoId++,
         ambiente: amb.nome,
+        ambienteId: amb.id,
+        categoria: amb.categoria,
         descricao: quantidade > 1 ? `${amb.nome} ${i}` : amb.nome,
         exigeDR: amb.dr,
         requerNeutroNoPonto: !!amb.requerNeutroNoPonto,
@@ -2080,6 +2079,8 @@ $('#btn-add-circuito').addEventListener('click', () => {
   circuitos.push({
     id: proximoId++,
     ambiente: ambienteSel ? ambienteSel.nome : 'Outro',
+    ambienteId: ambienteSel ? ambienteSel.id : null,
+    categoria: ambienteSel ? ambienteSel.categoria : null,
     descricao: $('#descricao').value.trim() || (ambienteSel ? ambienteSel.nome : 'Circuito'),
     exigeDR: $('#exigeDR').checked,
     requerNeutroNoPonto: !!(ambienteSel && ambienteSel.requerNeutroNoPonto),
@@ -2486,6 +2487,39 @@ function printHeaderHTML() {
   `;
 }
 
+// Sub-quadros dedicados — circuitos de CFTV e de automação/comando inteligente costumam
+// ficar num quadro/rack próprio, alimentado por um alimentador a partir do quadro geral,
+// em vez de dividir espaço com os disjuntores de força convencionais. Aqui eles continuam
+// contados no quadro geral (visão de todos os circuitos) e, além disso, ganham um desenho
+// e uma BOM próprios, como se fossem o quadro dedicado a essa função.
+const CFTV_IDS = ['cftv', 'com-cftv-acesso', 'cond-cftv'];
+
+function detectarSubQuadros(lista) {
+  const grupos = [];
+  const cftv = lista.filter((c) => CFTV_IDS.includes(c.ambienteId));
+  if (cftv.length) grupos.push({ titulo: 'Quadro de CFTV', circuitos: cftv });
+  const automacao = lista.filter((c) => c.categoria === 'automacao');
+  if (automacao.length) grupos.push({ titulo: 'Quadro de Comando Inteligente (Automação)', circuitos: automacao });
+  return grupos;
+}
+
+function subQuadroHTML(titulo, lista, tipoEntrada) {
+  const { svg, disjuntorGeral, geralPolos } = gerarSVGQuadro(lista, tipoEntrada);
+  const bom = gerarBOMConsolidada(lista, { disjuntorGeral, geralPolos });
+  return `
+    <div class="bom-group-title">${titulo}</div>
+    <div class="field-hint" style="margin-bottom:8px;">Alimentador dedicado a partir do quadro geral · Disjuntor de entrada ${geralPolos >= 4 ? 'tetrapolar' : 'bipolar'} ${disjuntorGeral ?? '—'} A · ${lista.length} circuito${lista.length === 1 ? '' : 's'}</div>
+    <div class="diagrama-container">${svg}</div>
+    ${detalhesTecnicosHTML(lista)}
+    ${bomTableHTML('Proteção do sub-quadro', bom.grupoProtecao)}
+    ${bomTableHTML('Disjuntores dos circuitos', bom.grupoDisjuntores)}
+    ${bomTableHTML('Condutores — fase / neutro', bom.grupoFase)}
+    ${bomTableHTML('Condutores — terra (PE)', bom.grupoTerra)}
+    ${bomTableHTML('Condutores adicionais — automação (neutro no ponto)', bom.grupoNeutroExtra)}
+    ${bomTableHTML('Quadro', bom.grupoQuadro)}
+  `;
+}
+
 $('#btn-gerar-quadro').addEventListener('click', () => {
   if (circuitos.length === 0) return;
   const projetoAtual = lerProjeto();
@@ -2502,6 +2536,9 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
     ? `<div class="veredito-geral ok"><div class="icon-circle">${iconCheck()}</div><div><h3>QUADRO 100% CONFORME COM A NBR 5410</h3><p>${circuitos.length} circuito${circuitos.length === 1 ? '' : 's'} dimensionado${circuitos.length === 1 ? '' : 's'} dentro dos limites de ampacidade, disjuntor e queda de tensão.</p></div></div>`
     : `<div class="veredito-geral fail"><div class="icon-circle">${iconX()}</div><div><h3>${naoConformes.length} DE ${circuitos.length} CIRCUITOS FORA DA NORMA</h3><p>Revisar: ${naoConformes.map((c) => escaparXML(c.descricao)).join(', ')}.</p></div></div>`;
 
+  const subQuadros = detectarSubQuadros(circuitos);
+  const subQuadrosHTML = subQuadros.map((g) => subQuadroHTML(g.titulo, g.circuitos, tipoEntrada)).join('');
+
   $('#quadro-conteudo').innerHTML = `
     ${printHeaderHTML()}
     ${fichaTecnicaHTML()}
@@ -2515,6 +2552,7 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
     ${bomTableHTML('Condutores — terra (PE)', bom.grupoTerra)}
     ${bomTableHTML('Condutores adicionais — automação (neutro no ponto)', bom.grupoNeutroExtra)}
     ${bomTableHTML('Quadro', bom.grupoQuadro)}
+    ${subQuadrosHTML}
     ${assinaturaHTML()}
     <div class="pdf-card">
       <div class="pdf-card-icon">
