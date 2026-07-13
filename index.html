@@ -400,7 +400,12 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
   body { background: #fff; }
   html, body { width: auto; overflow-x: visible; }
   .wrap { padding: 0; max-width: none; }
-  .quadro-panel.panel { border: none; box-shadow: none; padding: 0; }
+  .quadro-panel.panel { border: none; box-shadow: none; padding: 0; border-radius: 0; }
+  /* Qualquer caixa com cantos arredondados que precise fragmentar entre páginas pode virar
+     uma página "fantasma" em branco no Chrome (bug encontrado no diagrama do quadro — o
+     mesmo padrão pode acontecer em qualquer outra caixa arredondada da página, então a
+     correção é geral, não só no diagrama). */
+  * { border-radius: 0 !important; }
   .print-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 2px solid var(--navy); }
   .print-header img { height: 40px; }
   .print-header h2 { font-size: 16px; color: var(--navy); }
