@@ -217,6 +217,29 @@ input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-v
 .bin-row:last-child { border-bottom: none; }
 .bin-row .bin-label { font-size: 13.5px; color: var(--ink); }
 
+/* ---- checklist de cômodos / pontos atendidos ---- */
+.comodo-categoria-titulo { font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--navy); margin: 18px 0 8px; }
+.comodo-categoria-titulo:first-child { margin-top: 0; }
+.comodo-row { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; transition: border-color .12s ease, background .12s ease; }
+.comodo-row.ativo { border-color: var(--blue); background: var(--blue-tint); }
+.comodo-row .checkbox-row { font-weight: 600; }
+.comodo-campos { display: grid; grid-template-columns: 130px 130px 90px 1fr; gap: 12px; align-items: end; margin-top: 10px; }
+@media (max-width: 880px) { .comodo-campos { grid-template-columns: 1fr 1fr; } }
+.comodo-campos .field-label { font-size: 10.5px; }
+.comodo-resultado { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; grid-column: 1 / -1; }
+@media (min-width: 881px) { .comodo-resultado { grid-column: auto; } }
+.comodo-badge { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 100px; border: 1px solid var(--line); background: var(--paper); white-space: nowrap; }
+.comodo-badge.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+.comodo-badge.fail { color: var(--danger); background: var(--danger-bg); border-color: var(--danger-line); }
+
+/* ---- painel avançado colapsável (details/summary) ---- */
+summary.panel-summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+summary.panel-summary::-webkit-details-marker { display: none; }
+summary.panel-summary h2 { font-size: 18px; font-weight: 700; color: var(--navy); }
+summary.panel-summary .field-hint { font-weight: 400; }
+summary.panel-summary .chev { transition: transform .15s ease; }
+details[open] summary.panel-summary .chev { transform: rotate(90deg); }
+
 .btn { font-size: 13.5px; font-weight: 700; border-radius: 9px; padding: 10px 18px; cursor: pointer; border: 1px solid transparent; }
 .btn-orange { background: var(--orange); color: #fff; }
 .btn-orange:hover { background: var(--orange-deep); }
@@ -603,8 +626,24 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       </div>
     </section>
 
+    <section class="panel" id="painel-comodos">
+      <div class="section-title"><h2>Cômodos e pontos atendidos pela demanda</h2><span class="count" id="comodos-count">0 selecionados</span></div>
+      <div class="section-rule"></div>
+      <div class="field-hint" style="margin-bottom:14px;">Marque os cômodos/pontos que serão atendidos por esta demanda. A <strong>metragem até o quadro</strong> é obrigatória — é o dado que a NBR 5410 usa para calcular a queda de tensão do circuito. Cada linha já mostra, em tempo real: seção do cabo, disjuntor, corrente de projeto, condutor de proteção (PE/terra) e se o resultado está conforme a norma.</div>
+      <div id="comodos-lista"></div>
+      <div class="btn-row" style="justify-content:space-between;align-items:center;">
+        <span class="field-hint" id="comodos-hint"></span>
+        <button class="btn btn-orange" id="btn-add-comodos" disabled>Adicionar cômodos selecionados ao quadro</button>
+      </div>
+    </section>
+
     <section class="panel form-panel" id="painel-form-circuito">
-      <div class="section-title"><h2>Novo Circuito</h2></div>
+      <details>
+      <summary class="panel-summary">
+        <svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>
+        <h2>Circuito personalizado (avançado)</h2>
+        <span class="field-hint">Para casos fora da lista de cômodos: sistema trifásico, isolação EPR, método D, agrupamento de circuitos, ou um ponto que não está na biblioteca.</span>
+      </summary>
       <div class="section-rule"></div>
       <div class="grid-2col">
         <form id="form" autocomplete="off">
@@ -746,6 +785,7 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       <div class="btn-row">
         <button class="btn btn-orange" id="btn-add-circuito">+ Adicionar ao Quadro</button>
       </div>
+      </details>
     </section>
 
     <section class="panel circuitos-panel" id="painel-circuitos">
@@ -1500,6 +1540,7 @@ function onChangePerfil() {
   perfilAnterior = novo;
   atualizarVisibilidadePerfil();
   popularAmbientes();
+  renderComodos();
   $('#descricao').dataset.tocado = '';
   aplicarAmbiente();
   render();
@@ -1567,6 +1608,7 @@ function aplicarProjeto(p) {
   perfilAnterior = p.perfil || 'residencial';
   $('#com-atividade').value = p.atividadeComercial || '';
   popularAmbientes();
+  renderComodos();
 
   const au = p.automacao || {};
   $('#auto-casa-inteligente').value = au.casaInteligente || 'nao';
@@ -1600,6 +1642,146 @@ function carregarProjeto() {
     aplicarProjeto(dados.projeto);
   } catch (e) { /* dado corrompido — ignora e começa do zero */ }
 }
+
+/* ============ CÔMODOS E PONTOS ATENDIDOS (checklist com queda de tensão ao vivo) ============ */
+// Parâmetros padrão de instalação assumidos no modo checklist — quem precisar de sistema
+// trifásico, isolação EPR, método D ou agrupamento deve usar o "Circuito personalizado".
+function paramsPadraoComodo(amb, potencia, metragem) {
+  const cargaGrande = amb.pot >= 10000;
+  const sistema = cargaGrande ? 'trifasico' : 'monofasico';
+  const tensao = sistema === 'trifasico' ? 380 : 220;
+  return {
+    tipoCircuito: amb.tipo, sistema, tensao, potencia, cosPhi: amb.cosPhi ?? 1,
+    comprimento: metragem, isolacao: 'PVC', metodo: 'B1', tempAmbiente: 30, numCircuitos: 1,
+    limiteQuedaPercent: 4,
+  };
+}
+
+function linhaComodoInputs(ambId) {
+  const metragemEl = document.querySelector(`.comodo-metragem[data-id="${ambId}"]`);
+  const potenciaEl = document.querySelector(`.comodo-potencia[data-id="${ambId}"]`);
+  const qtdEl = document.querySelector(`.comodo-quantidade[data-id="${ambId}"]`);
+  return {
+    metragem: Number(metragemEl.value) || 0,
+    potencia: Number(potenciaEl.value) || 0,
+    quantidade: Math.max(1, Number(qtdEl.value) || 1),
+  };
+}
+
+function avaliarComodo(ambId) {
+  const amb = AMBIENTES.find((a) => a.id === ambId);
+  const resultadoEl = document.querySelector(`.comodo-resultado[data-id="${ambId}"]`);
+  if (!amb || !resultadoEl) return;
+  const { metragem, potencia, quantidade } = linhaComodoInputs(ambId);
+  if (!metragem || !potencia) {
+    resultadoEl.innerHTML = '<span class="field-hint">Informe metragem e potência para calcular a queda de tensão.</span>';
+    return;
+  }
+  const r = dimensionar(paramsPadraoComodo(amb, potencia, metragem));
+  if (!r) {
+    resultadoEl.innerHTML = '<span class="field-hint">Corrente fora da faixa de cálculo (até 300 mm²) — revise os valores.</span>';
+    return;
+  }
+  resultadoEl.innerHTML = `
+    <span class="comodo-badge ${r.conforme ? 'ok' : 'fail'}">${r.conforme ? 'CONFORME NBR 5410' : 'FORA DA NORMA'}</span>
+    <span class="comodo-badge">Seção ${r.secao} mm²</span>
+    <span class="comodo-badge">PE (terra) ${r.secaoProtecao} mm²</span>
+    <span class="comodo-badge">Disjuntor ${r.inom} A</span>
+    <span class="comodo-badge">Ib ${r.ib.toFixed(2)} A</span>
+    <span class="comodo-badge">Queda ${r.quedaPercent.toFixed(2)}% / 4%</span>
+    ${quantidade > 1 ? `<span class="comodo-badge">× ${quantidade} (por unidade)</span>` : ''}
+  `;
+}
+
+function atualizarBotaoComodos() {
+  const marcados = $all('.comodo-check:checked').length;
+  $('#btn-add-comodos').disabled = marcados === 0;
+  $('#comodos-hint').textContent = marcados > 0 ? `${marcados} cômodo${marcados === 1 ? '' : 's'} marcado${marcados === 1 ? '' : 's'}` : '';
+}
+
+function renderComodos() {
+  const perfil = perfilAtual();
+  const itensPerfil = AMBIENTES.filter((a) => a.perfil === perfil && a.id !== `outro-${perfil}`);
+  const categoriasUsadas = [];
+  itensPerfil.forEach((a) => { if (!categoriasUsadas.includes(a.categoria)) categoriasUsadas.push(a.categoria); });
+
+  const html = categoriasUsadas.map((catId) => {
+    const itens = itensPerfil.filter((a) => a.categoria === catId);
+    const linhas = itens.map((a) => `
+      <div class="comodo-row" id="comodo-row-${a.id}" data-id="${a.id}">
+        <label class="checkbox-row">
+          <input type="checkbox" class="comodo-check" data-id="${a.id}">
+          <span>${a.nome}</span>
+        </label>
+        <div class="comodo-campos" style="display:none;">
+          <div class="field">
+            <label class="field-label">Metragem até o quadro (m)</label>
+            <input type="number" class="comodo-metragem" data-id="${a.id}" value="15" min="1" step="0.5">
+          </div>
+          <div class="field">
+            <label class="field-label">Potência (W)</label>
+            <input type="number" class="comodo-potencia" data-id="${a.id}" value="${a.pot}" min="1" step="1">
+          </div>
+          <div class="field">
+            <label class="field-label">Quantidade</label>
+            <input type="number" class="comodo-quantidade" data-id="${a.id}" value="1" min="1" max="20" step="1">
+          </div>
+          <div class="comodo-resultado" data-id="${a.id}"></div>
+        </div>
+      </div>
+    `).join('');
+    return `<div class="comodo-categoria-titulo">${CATEGORIAS_AMBIENTE[catId] || catId}</div>${linhas}`;
+  }).join('');
+
+  $('#comodos-lista').innerHTML = html;
+
+  $all('.comodo-check').forEach((chk) => {
+    chk.addEventListener('change', () => {
+      const ambId = chk.dataset.id;
+      const row = $(`#comodo-row-${ambId}`);
+      row.classList.toggle('ativo', chk.checked);
+      row.querySelector('.comodo-campos').style.display = chk.checked ? 'grid' : 'none';
+      if (chk.checked) avaliarComodo(ambId);
+      atualizarBotaoComodos();
+      salvarProjeto();
+    });
+  });
+  $all('.comodo-metragem, .comodo-potencia, .comodo-quantidade').forEach((el) => {
+    el.addEventListener('input', () => avaliarComodo(el.dataset.id));
+  });
+  atualizarBotaoComodos();
+}
+
+$('#btn-add-comodos').addEventListener('click', () => {
+  const marcados = $all('.comodo-check:checked');
+  marcados.forEach((chk) => {
+    const ambId = chk.dataset.id;
+    const amb = AMBIENTES.find((a) => a.id === ambId);
+    const { metragem, potencia, quantidade } = linhaComodoInputs(ambId);
+    if (!amb || !metragem || !potencia) return;
+    for (let i = 1; i <= quantidade; i++) {
+      const params = paramsPadraoComodo(amb, potencia, metragem);
+      const resultado = dimensionar(params);
+      if (!resultado) continue;
+      circuitos.push({
+        id: proximoId++,
+        ambiente: amb.nome,
+        descricao: quantidade > 1 ? `${amb.nome} ${i}` : amb.nome,
+        exigeDR: amb.dr,
+        requerNeutroNoPonto: !!amb.requerNeutroNoPonto,
+        emergencia: amb.seguranca ? 'autonoma' : null,
+        params, resultado,
+      });
+    }
+    chk.checked = false;
+  });
+  quadroDesatualizado = true;
+  if ($('#quadro-panel').style.display !== 'none') marcarQuadroDesatualizado();
+  renderComodos();
+  renderListaCircuitos();
+  salvarProjeto();
+  $('#painel-circuitos').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 function aplicarAmbiente() {
   const amb = AMBIENTES.find((a) => a.id === $('#ambiente').value);
@@ -2296,6 +2478,7 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
 });
 
 popularAmbientes();
+renderComodos();
 popularServicos();
 popularAtividadesComerciais();
 popularDocumentosSituacao();
