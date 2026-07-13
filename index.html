@@ -152,12 +152,24 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 .app-sidebar .norm-badge, .app-sidebar .btn-logout { width: 100%; box-sizing: border-box; text-align: center; }
 .app-sidebar .norm-badge { white-space: normal; border-radius: 10px; line-height: 1.4; }
 .app-sidebar .btn-logout { background: transparent; }
+.sidebar-menu-toggle {
+  width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-family: var(--font-body); font-size: 13.5px; font-weight: 700; color: #fff; background: transparent;
+  border: 1px solid #2a3855; border-radius: 100px; padding: 9px 16px; cursor: pointer;
+}
+.sidebar-menu-toggle:hover { background: #1a2740; }
+.sidebar-menu-toggle .chev { flex: none; transition: transform .15s ease; }
+.app-sidebar.aberto .sidebar-menu-toggle .chev { transform: rotate(180deg); }
+.sidebar-menu-itens { display: none; flex-direction: column; gap: 10px; width: 100%; }
+.app-sidebar.aberto .sidebar-menu-itens { display: flex; }
 @media (max-width: 900px) {
   .app-body { flex-direction: column; }
   .app-sidebar {
     position: static; width: 100%; min-height: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
   }
   .app-sidebar .norm-badge, .app-sidebar .btn-logout { width: auto; }
+  .sidebar-menu-toggle { width: auto; }
+  .sidebar-menu-itens { flex-direction: row; flex-wrap: wrap; width: auto; }
 }
 #barra-salvar-flutuante {
   position: fixed; bottom: 22px; right: 22px; z-index: 60; display: flex; gap: 8px;
@@ -515,15 +527,21 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
   </div>
 
   <div class="app-body">
-    <aside class="app-sidebar">
-      <div class="norm-badge">ABNT NBR 5410:2004 · tabelas 33–48</div>
-      <div class="norm-badge" id="status-autosave" title="Os dados ficam salvos neste computador/navegador — não precisa de internet para salvar."><span class="dot-salvo"></span>Salvo neste dispositivo</div>
-      <button class="btn-logout" id="btn-biblioteca" title="Abre a biblioteca de projetos salvos neste navegador">Biblioteca</button>
-      <button class="btn-logout" id="btn-novo-projeto" title="Apaga os dados salvos neste navegador e começa um projeto em branco">Novo Projeto</button>
-      <button class="btn-logout" id="btn-exportar-projeto" title="Baixa um arquivo .json com todos os dados deste projeto">Exportar Projeto</button>
-      <button class="btn-logout" id="btn-importar-projeto" title="Abre um arquivo .json exportado por esta ferramenta">Importar Projeto</button>
-      <input type="file" id="input-importar-projeto" accept="application/json" style="display:none;">
-      <button class="btn-logout" id="btn-logout">Sair</button>
+    <aside class="app-sidebar" id="app-sidebar">
+      <button type="button" class="sidebar-menu-toggle" id="btn-menu-sidebar">
+        <span>☰ Menu</span>
+        <svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="sidebar-menu-itens" id="sidebar-menu-itens">
+        <div class="norm-badge">ABNT NBR 5410:2004 · tabelas 33–48</div>
+        <div class="norm-badge" id="status-autosave" title="Os dados ficam salvos neste computador/navegador — não precisa de internet para salvar."><span class="dot-salvo"></span>Salvo neste dispositivo</div>
+        <button class="btn-logout" id="btn-biblioteca" title="Abre a biblioteca de projetos salvos neste navegador">Biblioteca</button>
+        <button class="btn-logout" id="btn-novo-projeto" title="Apaga os dados salvos neste navegador e começa um projeto em branco">Novo Projeto</button>
+        <button class="btn-logout" id="btn-exportar-projeto" title="Baixa um arquivo .json com todos os dados deste projeto">Exportar Projeto</button>
+        <button class="btn-logout" id="btn-importar-projeto" title="Abre um arquivo .json exportado por esta ferramenta">Importar Projeto</button>
+        <input type="file" id="input-importar-projeto" accept="application/json" style="display:none;">
+        <button class="btn-logout" id="btn-logout">Sair</button>
+      </div>
     </aside>
 
     <div class="wrap">
@@ -1807,6 +1825,17 @@ document.addEventListener('click', (e) => {
   }
 });
 $('#sp-documentos').addEventListener('click', (e) => e.stopPropagation());
+
+$('#btn-menu-sidebar').addEventListener('click', (e) => {
+  e.stopPropagation();
+  $('#app-sidebar').classList.toggle('aberto');
+});
+document.addEventListener('click', (e) => {
+  const sidebar = $('#app-sidebar');
+  if (sidebar && sidebar.classList.contains('aberto') && !sidebar.contains(e.target)) {
+    sidebar.classList.remove('aberto');
+  }
+});
 
 function popularDocumentosSituacao() {
   $('#sp-documentos').innerHTML = SP_DOCUMENTOS.map((d, i) => `
