@@ -193,6 +193,7 @@ input[type="number"], input[type="text"], select {
   background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%;
 }
 input[type="text"] { font-family: var(--font-body); }
+input[type="file"] { font-family: var(--font-body); font-size: 12.5px; color: var(--ink-soft); }
 select { font-family: var(--font-body); font-size: 13.5px; appearance: none;
   background-image: linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%), linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
   background-position: calc(100% - 18px) center, calc(100% - 13px) center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 30px; }
@@ -473,16 +474,6 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
           <input type="text" id="id-cep" />
         </div>
         <div class="field">
-          <label class="field-label" for="id-uc">Número da unidade consumidora</label>
-          <input type="text" id="id-uc" />
-        </div>
-      </div>
-      <div class="row" style="margin-top:12px;">
-        <div class="field">
-          <label class="field-label" for="id-concessionaria">Concessionária</label>
-          <input type="text" id="id-concessionaria" />
-        </div>
-        <div class="field">
           <label class="field-label" for="id-tipo-obra">Tipo de obra</label>
           <select id="id-tipo-obra">
             <option value="nova">Nova</option>
@@ -561,7 +552,8 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       <div class="row" style="margin-top:12px;">
         <div class="field span-2">
           <span class="field-label">Documentos disponíveis</span>
-          <div class="chips" id="sp-documentos"></div>
+          <span class="field-hint">Marque o documento e anexe o arquivo (PDF, DWG/DXF, imagem ou ZIP) quando tiver em mãos — fica salvo junto com o projeto neste navegador. Arquivos acima de 3 MB não são anexados automaticamente (limite do armazenamento local); só o nome fica registrado.</span>
+          <div id="sp-documentos" style="margin-top:8px;"></div>
         </div>
       </div>
       <div class="row" style="margin-top:12px;">
@@ -1163,7 +1155,7 @@ $('#login-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const user = $('#login-user').value.trim();
   const pass = $('#login-pass').value;
-  if (user === 'NextObra' && pass === '#Solar2026') {
+  if (user === 'NextObra' && pass === '#Obras2026') {
     safeStorageSet(AUTH_KEY, '1');
     entrarNoApp();
   } else {
@@ -1418,6 +1410,7 @@ const SERVICOS_NEXTOBRA = [
   'Automação residencial',
   'Padrão de entrada e medição',
   'Manutenção elétrica preventiva',
+  'Levantamento as built elétrico',
 ];
 
 function popularAmbientes() {
@@ -1493,8 +1486,76 @@ function popularAtividadesComerciais() {
   sel.innerHTML = '<option value="">—</option>' + ATIVIDADES_COMERCIAIS.map((a) => `<option value="${a}">${a}</option>`).join('');
 }
 
+// Anexos reais dos documentos do projeto — guardados como data URL (base64) direto no
+// autosave do navegador. Não há "leitura" automática do conteúdo (a ferramenta não faz
+// OCR nem interpretação de PDF/CAD, é só anexo pra consulta) e há um teto de tamanho por
+// arquivo pra não estourar a cota do localStorage.
+const MAX_ANEXO_BYTES = 3 * 1024 * 1024;
+let anexosDocumentos = {};
+
 function popularDocumentosSituacao() {
-  $('#sp-documentos').innerHTML = SP_DOCUMENTOS.map((d, i) => `<label class="chip"><input type="checkbox" name="spDocumento" value="${i}">${d}</label>`).join('');
+  $('#sp-documentos').innerHTML = SP_DOCUMENTOS.map((d, i) => `
+    <div class="comodo-row" id="sp-doc-row-${i}">
+      <label class="checkbox-row">
+        <input type="checkbox" name="spDocumento" value="${i}" class="sp-doc-check" data-idx="${i}">
+        <span>${d}</span>
+      </label>
+      <div class="sp-doc-anexo" data-idx="${i}" style="display:none;margin-top:8px;">
+        <input type="file" class="sp-doc-arquivo" data-idx="${i}" accept=".pdf,.dwg,.dxf,.jpg,.jpeg,.png,.zip">
+        <div class="sp-anexo-info" data-idx="${i}" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"></div>
+      </div>
+    </div>
+  `).join('');
+
+  $all('.sp-doc-check').forEach((chk) => {
+    chk.addEventListener('change', () => {
+      const i = chk.dataset.idx;
+      $(`.sp-doc-anexo[data-idx="${i}"]`).style.display = chk.checked ? '' : 'none';
+      $(`#sp-doc-row-${i}`).classList.toggle('ativo', chk.checked);
+      if (!chk.checked) { delete anexosDocumentos[i]; renderAnexoInfo(i); }
+      salvarProjeto();
+    });
+  });
+
+  $all('.sp-doc-arquivo').forEach((inp) => {
+    inp.addEventListener('change', () => {
+      const i = inp.dataset.idx;
+      const file = inp.files[0];
+      if (!file) return;
+      if (file.size > MAX_ANEXO_BYTES) {
+        anexosDocumentos[i] = { nome: file.name, tamanho: file.size, dataUrl: null };
+        renderAnexoInfo(i);
+        salvarProjeto();
+        alert(`"${file.name}" tem ${(file.size / 1024 / 1024).toFixed(1)} MB — acima do limite de 3 MB para anexo automático. O nome do arquivo fica registrado no projeto, mas guarde o arquivo original à parte.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        anexosDocumentos[i] = { nome: file.name, tamanho: file.size, dataUrl: reader.result };
+        renderAnexoInfo(i);
+        salvarProjeto();
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+}
+
+function renderAnexoInfo(i) {
+  const el = document.querySelector(`.sp-anexo-info[data-idx="${i}"]`);
+  if (!el) return;
+  const anexo = anexosDocumentos[i];
+  if (!anexo) { el.innerHTML = ''; return; }
+  const tamanhoKb = (anexo.tamanho / 1024).toFixed(0);
+  el.innerHTML = anexo.dataUrl
+    ? `<a href="${anexo.dataUrl}" target="_blank" rel="noopener" class="comodo-badge ok">Abrir ${escaparXML(anexo.nome)} (${tamanhoKb} KB)</a><button type="button" class="btn-remove" data-remover-anexo="${i}">Remover</button>`
+    : `<span class="comodo-badge fail">${escaparXML(anexo.nome)} (${tamanhoKb} KB) — só o nome foi salvo, arquivo muito grande</span><button type="button" class="btn-remove" data-remover-anexo="${i}">Remover</button>`;
+  el.querySelector(`[data-remover-anexo="${i}"]`).addEventListener('click', () => {
+    delete anexosDocumentos[i];
+    const inp = document.querySelector(`.sp-doc-arquivo[data-idx="${i}"]`);
+    if (inp) inp.value = '';
+    renderAnexoInfo(i);
+    salvarProjeto();
+  });
 }
 function popularAutoServicos() {
   $('#auto-servicos').innerHTML = AUTO_SERVICOS_LISTA.map((s, i) => `<label class="chip"><input type="checkbox" name="autoServico" value="${i}">${s}</label>`).join('');
@@ -1550,8 +1611,8 @@ function lerProjeto() {
   return {
     identificacao: {
       cliente: $('#id-cliente').value, empreendimento: $('#id-empreendimento').value, endereco: $('#id-endereco').value,
-      cidade: $('#id-cidade').value, estado: $('#id-estado').value, cep: $('#id-cep').value, uc: $('#id-uc').value,
-      concessionaria: $('#id-concessionaria').value, tipoObra: $('#id-tipo-obra').value,
+      cidade: $('#id-cidade').value, estado: $('#id-estado').value, cep: $('#id-cep').value,
+      tipoObra: $('#id-tipo-obra').value,
       tipoEntrada: (document.querySelector('input[name="tipoEntrada"]:checked') || {}).value || 'monofasica',
       responsavel: $('#id-responsavel').value, data: $('#id-data').value, revisao: $('#id-revisao').value,
       observacoes: $('#id-observacoes').value,
@@ -1560,6 +1621,7 @@ function lerProjeto() {
       existeProjeto: (document.querySelector('input[name="existeProjeto"]:checked') || {}).value || 'nao',
       situacao: $('#sp-situacao').value,
       documentos: $all('input[name="spDocumento"]:checked').map((el) => Number(el.value)),
+      anexos: anexosDocumentos,
       responsavel: $('#sp-responsavel').value, data: $('#sp-data').value, revisao: $('#sp-revisao').value,
       observacoes: $('#sp-observacoes').value, pendencias: $('#sp-pendencias').value,
     },
@@ -1588,7 +1650,7 @@ function aplicarProjeto(p) {
   const id = p.identificacao || {};
   $('#id-cliente').value = id.cliente || ''; $('#id-empreendimento').value = id.empreendimento || '';
   $('#id-endereco').value = id.endereco || ''; $('#id-cidade').value = id.cidade || ''; $('#id-estado').value = id.estado || '';
-  $('#id-cep').value = id.cep || ''; $('#id-uc').value = id.uc || ''; $('#id-concessionaria').value = id.concessionaria || '';
+  $('#id-cep').value = id.cep || '';
   $('#id-tipo-obra').value = id.tipoObra || 'nova';
   const radioEntrada = document.querySelector(`input[name="tipoEntrada"][value="${id.tipoEntrada || 'monofasica'}"]`);
   if (radioEntrada) radioEntrada.checked = true;
@@ -1599,7 +1661,16 @@ function aplicarProjeto(p) {
   const radioExiste = document.querySelector(`input[name="existeProjeto"][value="${sp.existeProjeto || 'nao'}"]`);
   if (radioExiste) radioExiste.checked = true;
   $('#sp-situacao').value = sp.situacao || '';
-  (sp.documentos || []).forEach((i) => { const el = document.querySelector(`input[name="spDocumento"][value="${i}"]`); if (el) el.checked = true; });
+  anexosDocumentos = sp.anexos || {};
+  (sp.documentos || []).forEach((i) => {
+    const el = document.querySelector(`input[name="spDocumento"][value="${i}"]`);
+    if (el) {
+      el.checked = true;
+      $(`.sp-doc-anexo[data-idx="${i}"]`).style.display = '';
+      $(`#sp-doc-row-${i}`).classList.add('ativo');
+    }
+  });
+  Object.keys(anexosDocumentos).forEach((i) => renderAnexoInfo(i));
   $('#sp-responsavel').value = sp.responsavel || ''; $('#sp-data').value = sp.data || '';
   $('#sp-revisao').value = sp.revisao || ''; $('#sp-observacoes').value = sp.observacoes || ''; $('#sp-pendencias').value = sp.pendencias || '';
 
@@ -1631,7 +1702,15 @@ function aplicarProjeto(p) {
 }
 
 function salvarProjeto() {
-  safeStorageSet(PROJETO_KEY, JSON.stringify({ projeto: lerProjeto(), circuitos, proximoId }));
+  const payload = JSON.stringify({ projeto: lerProjeto(), circuitos, proximoId });
+  try {
+    localStorage.setItem(PROJETO_KEY, payload);
+  } catch (e) {
+    if (!window.__avisoStorageCheio) {
+      window.__avisoStorageCheio = true;
+      alert('O projeto ficou grande demais para salvar automaticamente no navegador (provavelmente por causa de anexos). Remova algum anexo grande — os demais dados continuam funcionando nesta sessão, mas podem não ser salvos ao recarregar a página.');
+    }
+  }
 }
 function carregarProjeto() {
   const raw = safeStorageGet(PROJETO_KEY);
@@ -2346,7 +2425,7 @@ function fichaTecnicaHTML() {
   const p = lerProjeto();
   const id = p.identificacao, sp = p.situacaoProjeto, au = p.automacao;
   const linha = (label, val) => val ? `<tr><td>${label}</td><td>${escaparXML(val)}</td></tr>` : '';
-  const docsTexto = sp.documentos.map((i) => SP_DOCUMENTOS[i]).join(', ');
+  const docsTexto = sp.documentos.map((i) => `${SP_DOCUMENTOS[i]}${sp.anexos && sp.anexos[i] ? ' (anexado)' : ''}`).join(', ');
   const autoServicosTexto = au.servicos.map((i) => AUTO_SERVICOS_LISTA[i]).join(', ');
   const autoPontosTexto = au.pontos.map((i) => AUTO_PONTOS_LISTA[i]).join(', ');
 
@@ -2356,8 +2435,6 @@ function fichaTecnicaHTML() {
       ${linha('Cliente', id.cliente)}
       ${linha('Empreendimento', id.empreendimento)}
       ${linha('Endereço', [id.endereco, id.cidade, id.estado, id.cep].filter(Boolean).join(' — '))}
-      ${linha('Unidade consumidora', id.uc)}
-      ${linha('Concessionária', id.concessionaria)}
       ${linha('Tipo de obra', LABEL_TIPO_OBRA[id.tipoObra])}
       ${linha('Perfil da instalação', LABEL_PERFIL[p.perfil])}
       ${linha('Atividade comercial', p.atividadeComercial)}
