@@ -170,6 +170,11 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
   .app-sidebar .norm-badge, .app-sidebar .btn-logout { width: auto; }
   .sidebar-menu-toggle { width: auto; }
   .sidebar-menu-itens { flex-direction: row; flex-wrap: wrap; width: auto; }
+  /* Nesta largura o corpo vira coluna (.app-body) e o .wrap passa a ser o item cruzado
+     (largura); align-self:stretch não estava sendo respeitado aqui, então a largura
+     explícita garante que o .wrap ocupe a tela inteira em vez de se dimensionar pelo
+     conteúdo mais largo (ex.: a trilha do stepper) e estourar a tela. */
+  .wrap { margin-left: 0; margin-right: 0; width: 100%; }
 }
 #barra-salvar-flutuante {
   position: fixed; bottom: 22px; right: 22px; z-index: 60; display: flex; gap: 8px;
@@ -190,7 +195,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 }
 .btn-logout:hover { background: #1a2740; }
 
-.wrap { max-width: 1180px; margin: 0 auto; padding: 26px 20px 60px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 26px 20px 60px; min-width: 0; flex: 1 1 auto; align-self: stretch; }
 
 .disclaimer {
   display: flex; gap: 12px; align-items: flex-start;
@@ -431,6 +436,51 @@ footer.note strong { color: var(--ink-soft); }
 table.tabela-tecnica { font-size: 11.5px; min-width: 1100px; }
 table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space: nowrap; }
 
+/* ---- ProjectStepper (Sprint UI-003) ----
+   Camada puramente visual: reorganiza em etapas os mesmos painéis/campos que já
+   existiam na página (mesmos ids, names e listeners). Nenhum painel foi
+   duplicado — cada um ganhou apenas o atributo data-etapa (ou, quando um painel
+   precisava ser dividido entre duas etapas, um <div data-etapa> interno
+   envolvendo linhas já existentes) para que o controller mostre só a etapa
+   atual e recolha as demais. */
+.stepper-nav {
+  background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 16px 18px; margin-bottom: 22px;
+}
+.stepper-trilha { display: flex; align-items: flex-start; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
+.stepper-passo {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1 1 0; min-width: 62px;
+  background: none; border: none; cursor: pointer; padding: 4px 2px; font-family: var(--font-body); color: inherit;
+}
+.stepper-passo .stepper-bolha {
+  width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; border: 2px solid var(--line);
+  background: var(--paper-2); color: var(--ink-faint); transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.stepper-passo .stepper-rotulo { font-size: 11px; font-weight: 600; color: var(--ink-faint); text-align: center; line-height: 1.25; transition: color .15s ease; }
+.stepper-passo.concluida .stepper-bolha { background: var(--ok); border-color: var(--ok); color: #fff; }
+.stepper-passo.atual .stepper-bolha { background: var(--orange); border-color: var(--orange); color: #fff; }
+.stepper-passo.atual .stepper-rotulo { color: var(--navy); }
+.stepper-passo:hover .stepper-rotulo { color: var(--ink); }
+.stepper-passo:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
+.stepper-linha { flex: none; align-self: flex-start; margin-top: 15px; width: 100%; height: 2px; background: var(--line); }
+.stepper-linha.concluida { background: var(--ok); }
+.stepper-linha-wrap { display: flex; flex: 1 1 0; align-items: flex-start; min-width: 6px; }
+.stepper-progresso-track { height: 5px; border-radius: 100px; background: var(--line-soft); overflow: hidden; margin-top: 14px; }
+.stepper-progresso-fill { height: 100%; border-radius: 100px; background: var(--orange); transition: width .2s ease; }
+.stepper-acoes { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.stepper-acoes .stepper-etapa-atual-label { font-size: 12.5px; color: var(--ink-faint); }
+.stepper-acoes .stepper-botoes { display: flex; gap: 8px; }
+@media (max-width: 760px) {
+  .stepper-trilha { display: none; }
+  .stepper-progresso-track { margin-top: 4px; }
+  /* Sem isso, o <select> "Ir para etapa" ficava espremido ao lado dos botões
+     Anterior/Próximo e cortava o texto da opção selecionada no meio da palavra. */
+  .stepper-acoes { flex-direction: column; align-items: stretch; }
+  .stepper-botoes { flex-wrap: wrap; }
+  #stepper-select-etapa { flex: 1 1 100%; }
+  #stepper-btn-anterior, #stepper-btn-proximo { flex: 1 1 auto; }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media print {
   /* Dimensões explícitas (297mm x 210mm, largura > altura = paisagem) em vez da palavra-chave
@@ -512,8 +562,9 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
 
 <div id="app">
   <div id="barra-salvar-flutuante" class="tela-apenas">
-    <button class="btn btn-orange" id="btn-salvar-flutuante" title="Baixa um arquivo .json com todo o projeto no seu computador">💾 Salvar Projeto</button>
+    <button class="btn btn-orange" id="btn-salvar-flutuante" title="Salva o projeto neste navegador — não baixa arquivo">💾 Salvar Projeto</button>
     <button class="btn btn-outline" id="btn-abrir-flutuante" title="Abre um arquivo .json de projeto salvo anteriormente">📂 Abrir Projeto</button>
+    <span id="confirmacao-salvar-projeto" aria-live="polite" style="margin-left:10px;align-self:center;color:#2f9e5c;font-size:13px;font-weight:600;opacity:0;transition:opacity .25s ease;"></span>
   </div>
   <div class="masthead-bar">
     <div class="masthead-inner">
@@ -569,17 +620,27 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       <div id="biblioteca-lista"></div>
     </section>
 
-    <section class="panel" id="painel-identificacao">
+    <nav class="stepper-nav" id="stepper-nav" aria-label="Etapas do levantamento técnico">
+      <div class="stepper-trilha" id="stepper-trilha"></div>
+      <div class="stepper-progresso-track"><div class="stepper-progresso-fill" id="stepper-progresso-fill" style="width:0%;"></div></div>
+      <div class="stepper-acoes">
+        <span class="stepper-etapa-atual-label" id="stepper-etapa-atual-label"></span>
+        <div class="stepper-botoes">
+          <select id="stepper-select-etapa" class="stepper-select" aria-label="Ir para etapa" style="font-family:var(--font-body); font-size:12.5px; color:var(--ink); background:var(--paper-2); border:1px solid var(--line); border-radius:8px; padding:6px 8px;"></select>
+          <button type="button" class="btn btn-outline" id="stepper-btn-anterior">← Anterior</button>
+          <button type="button" class="btn btn-orange" id="stepper-btn-proximo">Próximo →</button>
+        </div>
+      </div>
+    </nav>
+
+    <section class="panel" id="painel-identificacao" data-etapa="1,2">
       <div class="section-title"><h2>Identificação do empreendimento</h2></div>
-      <div class="section-rule"></div>
+      <div class="section-rule" data-etapa="1,2"></div>
+      <div data-etapa="1">
       <div class="row">
         <div class="field">
           <label class="field-label" for="id-cliente">Nome do cliente</label>
           <input type="text" id="id-cliente" />
-        </div>
-        <div class="field">
-          <label class="field-label" for="id-empreendimento">Nome do empreendimento</label>
-          <input type="text" id="id-empreendimento" />
         </div>
       </div>
       <div class="row" style="margin-top:12px;">
@@ -596,6 +657,14 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
         <div class="field span-2">
           <label class="field-label" for="id-orgao-emissor">Órgão emissor do RG</label>
           <input type="text" id="id-orgao-emissor" placeholder="Ex.: SSP/PA" />
+        </div>
+      </div>
+      </div>
+      <div data-etapa="2">
+      <div class="row">
+        <div class="field">
+          <label class="field-label" for="id-empreendimento">Nome do empreendimento</label>
+          <input type="text" id="id-empreendimento" />
         </div>
       </div>
       <div class="row" style="margin-top:12px;">
@@ -646,9 +715,10 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
           <a href="#" id="id-ver-mapa" target="_blank" rel="noopener" class="field-hint" style="display:none;">Ver localização no mapa →</a>
         </div>
       </div>
+      </div>
     </section>
 
-    <section class="panel" id="painel-perfil">
+    <section class="panel" id="painel-perfil" data-etapa="3">
       <div class="section-title"><h2>Selecione o perfil da instalação</h2></div>
       <div class="section-rule"></div>
       <div class="chips" id="chip-perfil">
@@ -677,9 +747,10 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       </div>
     </section>
 
-    <section class="panel" id="painel-config-instalacao">
+    <section class="panel" id="painel-config-instalacao" data-etapa="2,3">
       <div class="section-title"><h2>Configuração da instalação</h2></div>
       <div class="section-rule"></div>
+      <div data-etapa="3">
       <div class="row">
         <div class="field span-2 highlight">
           <span class="field-label">Tipo de entrada de serviço</span>
@@ -691,7 +762,9 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
           <span class="field-hint">Define o disjuntor geral e as barras de fase do desenho do quadro — independe do sistema de cada circuito individual.</span>
         </div>
       </div>
-      <div class="row" style="margin-top:12px;">
+      </div>
+      <div data-etapa="2">
+      <div class="row">
         <div class="field">
           <label class="field-label" for="id-responsavel">Responsável técnico</label>
           <input type="text" id="id-responsavel" />
@@ -713,9 +786,10 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
           <input type="text" id="id-observacoes" />
         </div>
       </div>
+      </div>
     </section>
 
-    <section class="panel" id="painel-situacao-projeto">
+    <section class="panel" id="painel-situacao-projeto" data-etapa="2">
       <div class="section-title"><h2>Documentação e situação do projeto elétrico</h2></div>
       <div class="section-rule"></div>
       <div class="row">
@@ -788,7 +862,7 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       </div>
     </section>
 
-    <section class="panel" id="painel-comodos">
+    <section class="panel" id="painel-comodos" data-etapa="4">
       <div class="section-title"><h2>Cômodos e pontos atendidos pela demanda</h2><span class="count" id="comodos-count">0 selecionados</span></div>
       <div class="section-rule"></div>
       <div class="field-hint" style="margin-bottom:14px;">Marque os cômodos/pontos que serão atendidos por esta demanda. A <strong>metragem até o quadro</strong> é obrigatória — é o dado que a NBR 5410 usa para calcular a queda de tensão do circuito. Cada linha já mostra, em tempo real: seção do cabo, disjuntor, corrente de projeto, condutor de proteção (PE/terra) e se o resultado está conforme a norma.</div>
@@ -799,7 +873,7 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       </div>
     </section>
 
-    <section class="panel form-panel" id="painel-form-circuito">
+    <section class="panel form-panel" id="painel-form-circuito" data-etapa="5">
       <details>
       <summary class="panel-summary">
         <svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>
@@ -950,7 +1024,7 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       </details>
     </section>
 
-    <section class="panel circuitos-panel" id="painel-circuitos">
+    <section class="panel circuitos-panel" id="painel-circuitos" data-etapa="5">
       <div class="section-title"><h2>Levantamento Técnico de Dimensionamento Elétrico</h2><span class="count" id="circuitos-count">0 circuitos</span></div>
       <div class="section-rule"></div>
       <div id="circuitos-lista"></div>
@@ -959,6 +1033,7 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
       </div>
     </section>
 
+    <div data-etapa="5">
     <section class="panel" id="painel-automacao">
       <div class="section-title"><h2>Casa inteligente e automação residencial</h2></div>
       <div class="section-rule"></div>
@@ -1068,12 +1143,24 @@ table.tabela-tecnica td, table.tabela-tecnica th { padding: 7px 9px; white-space
         <div class="field-hint" style="margin-top:14px;">Alexa depende de conexão à internet para determinadas funções. A integração com fabricante, modelo e protocolo específicos deve ser confirmada antes da execução — não é garantida automaticamente por esta ferramenta.</div>
       </div>
     </section>
+    </div>
 
+    <div data-etapa="6,7" id="stepper-aviso-resultado-pendente" style="display:none;">
+      <section class="panel" style="text-align:center; color:var(--ink-faint); padding:36px 22px;">
+        <p style="margin-bottom:14px;">O quadro de distribuição ainda não foi gerado. Volte para a etapa <strong>5. Circuitos</strong> e clique em "Gerar Quadro de Distribuição".</p>
+        <button type="button" class="btn btn-outline" id="stepper-btn-ir-circuitos">← Ir para Circuitos</button>
+      </section>
+    </div>
+
+    <div data-etapa="6,7" class="tela-apenas" id="auditoria-planejador-container"></div>
+
+    <div data-etapa="6,7">
     <section class="panel quadro-panel" id="quadro-panel" style="display:none;">
       <div class="section-title tela-apenas"><h2>Quadro de Distribuição</h2></div>
       <div class="section-rule tela-apenas"></div>
       <div id="quadro-conteudo"></div>
     </section>
+    </div>
 
     <section class="panel servicos">
       <div class="section-title"><h2>Serviços elétricos NextObra</h2></div>
@@ -1340,6 +1427,130 @@ $('#btn-logout').addEventListener('click', () => {
   location.reload();
 });
 checkAuth();
+
+/* ============ PROJECT STEPPER (Sprint UI-003) ============ */
+// Camada puramente visual sobre os mesmos painéis/campos já existentes (mesmos ids, names
+// e listeners) — nenhum cálculo, SVG, PDF ou motor NBR 5410 é alterado por este módulo.
+// Painéis inteiros ganharam o atributo data-etapa diretamente na <section>; painéis que
+// precisavam ser divididos entre duas etapas (identificação, configuração da instalação)
+// ganharam <div data-etapa="N"> internos envolvendo linhas já existentes, sem duplicar HTML.
+const WIZARD_ETAPA_KEY = 'nextobra_qdc_wizard_etapa';
+const ETAPAS_WIZARD = [
+  { n: 1, rotulo: 'Dados do Cliente' },
+  { n: 2, rotulo: 'Dados da Obra' },
+  { n: 3, rotulo: 'Perfil da Instalação' },
+  { n: 4, rotulo: 'Ambientes' },
+  { n: 5, rotulo: 'Circuitos' },
+  { n: 6, rotulo: 'Resultado' },
+  { n: 7, rotulo: 'Relatório' },
+];
+let etapaAtualWizard = 1;
+
+function elementosDaEtapa(n) {
+  return $all('[data-etapa]').filter((el) => el.dataset.etapa.split(',').map(Number).includes(n));
+}
+
+// Painéis com lógica própria de exibição (automação só aparece se o perfil for
+// residencial; o quadro só aparece depois de gerado) ficam dentro de um <div data-etapa>
+// wrapper — o wizard só controla o display desse wrapper, nunca o do elemento original
+// lá dentro. Isso separa as duas camadas de visibilidade (etapa atual × condição própria
+// do app) sem que uma sobrescreva a outra: se qualquer uma disser "escondido", o
+// conteúdo some; só aparece quando as duas permitem.
+function aplicarVisibilidadeEtapa(n) {
+  $all('[data-etapa]').forEach((el) => {
+    const etapas = el.dataset.etapa.split(',').map(Number);
+    el.style.display = etapas.includes(n) ? '' : 'none';
+  });
+}
+
+function circuitosEtapaConcluida(n) {
+  // Heurística conservadora de "concluída": só marca como feita uma etapa anterior à
+  // atual que já tenha algum dado preenchido — nunca inventa conclusão para etapas ainda
+  // não visitadas. A etapa atual nunca é "concluída" (fica com o estado "atual").
+  try {
+    switch (n) {
+      case 1: return !!$('#id-cliente').value.trim();
+      case 2: return !!$('#id-empreendimento').value.trim();
+      case 3: return true; // sempre tem um valor padrão marcado (chips com checked)
+      case 4: return circuitos && circuitos.length > 0;
+      case 5: return circuitos && circuitos.length > 0;
+      case 6: return $('#quadro-panel').style.display === 'block';
+      case 7: return $('#quadro-panel').style.display === 'block';
+      default: return false;
+    }
+  } catch (e) { return false; }
+}
+
+function renderizarTrilhaWizard() {
+  const trilha = $('#stepper-trilha');
+  const select = $('#stepper-select-etapa');
+  if (!trilha || !select) return;
+  trilha.innerHTML = ETAPAS_WIZARD.map((etapa, i) => {
+    const concluida = etapa.n < etapaAtualWizard && circuitosEtapaConcluida(etapa.n);
+    const classe = etapa.n === etapaAtualWizard ? 'atual' : (concluida ? 'concluida' : '');
+    const numero = concluida ? '✓' : etapa.n;
+    const linha = i < ETAPAS_WIZARD.length - 1
+      ? `<div class="stepper-linha-wrap"><div class="stepper-linha ${etapa.n < etapaAtualWizard ? 'concluida' : ''}"></div></div>`
+      : '';
+    return `
+      <button type="button" class="stepper-passo ${classe}" data-ir-etapa="${etapa.n}" title="${etapa.n}. ${etapa.rotulo}">
+        <span class="stepper-bolha">${numero}</span>
+        <span class="stepper-rotulo">${etapa.rotulo}</span>
+      </button>
+      ${linha}
+    `;
+  }).join('');
+  $all('[data-ir-etapa]').forEach((btn) => btn.addEventListener('click', () => irParaEtapaWizard(Number(btn.dataset.irEtapa))));
+  select.innerHTML = ETAPAS_WIZARD.map((etapa) => `<option value="${etapa.n}">${etapa.n}. ${etapa.rotulo}</option>`).join('');
+  select.value = String(etapaAtualWizard);
+  const fill = $('#stepper-progresso-fill');
+  if (fill) fill.style.width = `${(etapaAtualWizard / ETAPAS_WIZARD.length) * 100}%`;
+  const label = $('#stepper-etapa-atual-label');
+  if (label) label.textContent = `Etapa ${etapaAtualWizard} de ${ETAPAS_WIZARD.length} — ${ETAPAS_WIZARD[etapaAtualWizard - 1].rotulo}`;
+  const btnAnterior = $('#stepper-btn-anterior');
+  const btnProximo = $('#stepper-btn-proximo');
+  if (btnAnterior) btnAnterior.disabled = etapaAtualWizard === 1;
+  if (btnProximo) btnProximo.textContent = etapaAtualWizard === ETAPAS_WIZARD.length ? 'Concluído ✓' : 'Próximo →';
+}
+
+// Etapas 6/7 mostram o mesmo #quadro-panel (o card de exportação em PDF é gerado junto
+// com o resultado, no mesmo innerHTML — dividi-los em painéis fisicamente separados exigiria
+// duplicar/alterar o template que monta o PDF, o que está fora do escopo desta Sprint). Sem
+// esse aviso, quem clicasse em "Resultado" ou "Relatório" antes de gerar o quadro veria a
+// etapa completamente vazia.
+function atualizarAvisoResultadoPendente(n) {
+  const aviso = $('#stepper-aviso-resultado-pendente');
+  if (!aviso) return;
+  const gerado = $('#quadro-panel').style.display === 'block';
+  aviso.style.display = (n === 6 || n === 7) && !gerado ? '' : 'none';
+}
+
+function irParaEtapaWizard(n) {
+  if (n < 1 || n > ETAPAS_WIZARD.length) return;
+  etapaAtualWizard = n;
+  aplicarVisibilidadeEtapa(n);
+  atualizarAvisoResultadoPendente(n);
+  renderizarTrilhaWizard();
+  safeStorageSet(WIZARD_ETAPA_KEY, String(n));
+  $('#stepper-nav').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+$('#stepper-btn-anterior').addEventListener('click', () => irParaEtapaWizard(etapaAtualWizard - 1));
+$('#stepper-btn-proximo').addEventListener('click', () => {
+  if (etapaAtualWizard < ETAPAS_WIZARD.length) irParaEtapaWizard(etapaAtualWizard + 1);
+});
+$('#stepper-select-etapa').addEventListener('change', (e) => irParaEtapaWizard(Number(e.target.value)));
+$('#stepper-btn-ir-circuitos').addEventListener('click', () => irParaEtapaWizard(5));
+
+// "Continuar de onde parou": restaura a última etapa visitada neste navegador. Chave
+// própria do wizard — não faz parte do formato de dados do projeto (nextobra_qdc_projeto).
+(function inicializarWizard() {
+  const salva = Number(safeStorageGet(WIZARD_ETAPA_KEY));
+  etapaAtualWizard = (salva >= 1 && salva <= ETAPAS_WIZARD.length) ? salva : 1;
+  aplicarVisibilidadeEtapa(etapaAtualWizard);
+  atualizarAvisoResultadoPendente(etapaAtualWizard);
+  renderizarTrilhaWizard();
+})();
 
 /* ============ AMBIENTES ============ */
 // cosφ é valor típico assumido por categoria de equipamento (não é valor normativo) —
@@ -2143,7 +2354,15 @@ function importarProjeto(file) {
 $('#btn-novo-projeto').addEventListener('click', novoProjeto);
 $('#btn-exportar-projeto').addEventListener('click', exportarProjeto);
 $('#btn-importar-projeto').addEventListener('click', () => $('#input-importar-projeto').click());
-$('#btn-salvar-flutuante').addEventListener('click', exportarProjeto);
+$('#btn-salvar-flutuante').addEventListener('click', () => {
+  salvarProjeto();
+  const el = $('#confirmacao-salvar-projeto');
+  if (!el) return;
+  el.textContent = 'Projeto salvo com sucesso.';
+  el.style.opacity = '1';
+  clearTimeout(window.__timerConfirmacaoSalvarProjeto);
+  window.__timerConfirmacaoSalvarProjeto = setTimeout(() => { el.style.opacity = '0'; }, 2200);
+});
 $('#btn-abrir-flutuante').addEventListener('click', () => $('#input-importar-projeto').click());
 $('#input-importar-projeto').addEventListener('change', (e) => {
   const file = e.target.files[0];
@@ -2648,10 +2867,972 @@ $('#btn-add-circuito').addEventListener('click', () => {
 });
 
 /* ============ QUADRO DE DISTRIBUIÇÃO (SVG + BOM) ============ */
-function agruparPorDR(lista, tamanhoGrupo) {
+// ---- Taxonomia de classificação de decisão + registro auditável (Sprint CORE-002C) ----
+// Toda decisão do planejador (demanda, dispositivo geral, DR, DPS, balanceamento) precisa
+// declarar explicitamente que TIPO de afirmação está fazendo — nunca apresentar uma
+// heurística de projeto como se fosse exigência da ABNT NBR 5410.
+const CLASSIFICACAO_DECISAO = {
+  NORMATIVO_CONFIRMADO: 'requisito-normativo-confirmado',
+  CALCULO_TECNICO: 'calculo-tecnico',
+  HEURISTICA_CONFIGURAVEL: 'heuristica-configuravel',
+  RECOMENDACAO_PROJETO: 'recomendacao-projeto',
+  DADO_CONCESSIONARIA: 'dado-concessionaria',
+  DADO_FABRICANTE: 'dado-fabricante',
+  PENDENTE_ESPECIFICACAO: 'pendente-especificacao',
+};
+function criarDecisionRecord(id, assunto, entrada, resultado, classificacao, regra, fonte, premissas, dadosFaltantes, alertas, exigeValidacao) {
+  return {
+    id, assunto, entrada, resultado, classificacao, regra, fonte,
+    premissas: premissas || [], dadosFaltantes: dadosFaltantes || [], alertas: alertas || [],
+    exigeValidacao: exigeValidacao !== false,
+  };
+}
+
+// ---- Demanda da instalação (Sprint CORE-002C) ----
+// CORRIGE o problema mais grave apontado na validação: o disjuntor geral era escolhido a
+// partir da SOMA DIRETA de todos os Ib dos circuitos, tratada implicitamente como
+// "demanda". Isso não é um cálculo de demanda — é a corrente instalada equivalente (todos
+// os circuitos simultaneamente em plena carga). As duas grandezas agora são separadas
+// explicitamente, e NENHUM fator de demanda é inventado: sem uma tabela normativa ou de
+// concessionária verificável, o fator permanece 1 (sem redução), e o resultado é rotulado
+// como estimativa conservadora, nunca como "demanda determinada".
+function calcularDemandaInstalacao(projeto, circuitos, dadosInstalacao) {
+  dadosInstalacao = dadosInstalacao || {};
+  const cargaInstaladaW = circuitos.reduce((s, c) => s + (c.params.potencia || 0), 0);
+  const correnteInstaladaEquivalenteA = +circuitos.reduce((s, c) => s + c.resultado.ib, 0).toFixed(2);
+
+  let fatorDemanda, fonteFator, metodoUtilizado, classificacaoFator;
+  if (typeof dadosInstalacao.fatorDemandaManual === 'number' && dadosInstalacao.fatorDemandaManual > 0 && dadosInstalacao.fatorDemandaManual <= 1) {
+    fatorDemanda = dadosInstalacao.fatorDemandaManual;
+    fonteFator = 'informado manualmente pelo responsável técnico';
+    metodoUtilizado = 'fator de demanda configurado manualmente pelo responsável técnico';
+    classificacaoFator = CLASSIFICACAO_DECISAO.RECOMENDACAO_PROJETO;
+  } else {
+    fatorDemanda = 1;
+    fonteFator = 'não verificado — nenhuma tabela de fator de demanda por perfil/tipo de carga está confirmada nesta plataforma (exigiria referência normativa ou de concessionária real, hoje não codificada)';
+    metodoUtilizado = 'somatório integral das correntes de projeto (Ib) de todos os circuitos, sem redução por fator de demanda — método conservador; não representa necessariamente a operação simultânea real da instalação';
+    classificacaoFator = CLASSIFICACAO_DECISAO.PENDENTE_ESPECIFICACAO;
+  }
+
+  const correnteDemandaA = +(correnteInstaladaEquivalenteA * fatorDemanda).toFixed(2);
+  const demandaDeterminada = fatorDemanda !== 1;
+  const alertas = [];
+  if (!demandaDeterminada) {
+    alertas.push('Demanda não determinada por fator real — o valor de corrente de demanda usado é a soma integral das correntes de projeto (sem redução), uma estimativa conservadora, não um cálculo de demanda validado por norma ou concessionária.');
+  }
+
+  const decisao = criarDecisionRecord(
+    'DEMANDA-01', 'Cálculo da demanda da instalação',
+    { totalCircuitos: circuitos.length, cargaInstaladaW: +cargaInstaladaW.toFixed(2), correnteInstaladaEquivalenteA },
+    { correnteDemandaA, fatorDemanda, metodoUtilizado },
+    classificacaoFator, metodoUtilizado, fonteFator,
+    ['Nenhum fator de demanda normativo ou de concessionária foi codificado nesta plataforma — valor padrão = 1 (sem redução) até que um dado real seja informado.'],
+    demandaDeterminada ? [] : ['fator de demanda real (norma/concessionária/critério de projeto confirmado)'],
+    alertas, true,
+  );
+
+  return {
+    cargaInstaladaW: +cargaInstaladaW.toFixed(2),
+    correnteInstaladaEquivalenteA,
+    demandaConsiderada: demandaDeterminada ? 'determinada (fator informado pelo responsável técnico)' : 'não determinada — estimativa conservadora (fator = 1, sem redução)',
+    metodoUtilizado,
+    fatorDemanda,
+    fonteFator,
+    correnteDemandaA,
+    alimentador: { secao: 'não determinada — comprimento/método de instalação do alimentador geral não coletados por esta plataforma', iz: 'não determinada' },
+    limitacoes: ['Seção/Iz do alimentador geral não podem ser calculados: esta plataforma coleta comprimento e método de instalação por circuito terminal, mas não do alimentador geral.'],
+    alertas,
+    decisao,
+  };
+}
+
+// ---- Tecnologia do dispositivo geral: minidisjuntor DIN × caixa moldada ----
+// Referência PRÁTICA de mercado, nunca normativa — a NBR 5410 não define esse limite; é
+// uma característica de catálogo de fabricante. Evita representar correntes elevadas como
+// se fossem um minidisjuntor modular comum.
+const LIMITE_MINIDISJUNTOR_DIN_A = 125;
+function classificarTecnologiaDispositivo(correnteA) {
+  if (correnteA === null || correnteA === undefined) {
+    return { tecnologia: 'a especificar', classificacao: CLASSIFICACAO_DECISAO.PENDENTE_ESPECIFICACAO, fonte: 'corrente do dispositivo ainda não determinada' };
+  }
+  const dentroDoLimite = correnteA <= LIMITE_MINIDISJUNTOR_DIN_A;
+  return {
+    tecnologia: dentroDoLimite ? 'minidisjuntor modular DIN' : 'disjuntor em caixa moldada',
+    classificacao: CLASSIFICACAO_DECISAO.RECOMENDACAO_PROJETO,
+    fonte: `referência prática de mercado (limite de ${LIMITE_MINIDISJUNTOR_DIN_A} A) — não é valor normativo da NBR 5410; confirmar com o catálogo do fabricante escolhido`,
+  };
+}
+
+// ---- Dispositivo geral (Sprint CORE-002C) ----
+// Substitui a antiga planejarDisjuntorGeral(): não seleciona mais o geral a partir da soma
+// direta de Ib (isso agora é feito, de forma explícita e auditável, em
+// calcularDemandaInstalacao()). Enquanto o alimentador (seção/Iz) e a corrente de curto-
+// circuito presumida não forem conhecidos — o que esta plataforma ainda não coleta — o
+// resultado é sempre uma ESTIMATIVA PRELIMINAR, nunca um valor definitivo, respeitando
+// Ib_demanda ≤ In_geral ≤ Iz_alimentador (o lado direito fica pendente).
+const LIMIARES_HEURISTICOS_GERAL_A = { residencial: 100, condominial: 250, comercial: 630 };
+function planejarDispositivoGeral(demanda, alimentador, curtoCircuito, entrada) {
+  const perfil = entrada.perfil;
+  const polos = POLOS_GERAL_POR_ENTRADA[entrada.tipoEntrada] ?? null;
+  const alertas = [];
+  const dadosFaltantes = [];
+
+  if (demanda.correnteDemandaA === null || demanda.correnteDemandaA === undefined) {
+    return {
+      disjuntorGeral: null, polos, tecnologia: 'a especificar', status: 'pendente',
+      mensagem: 'Disjuntor geral pendente de definição da demanda.',
+      somaIbGeral: null, correnteDemandaA: null,
+      alertas: ['Demanda da instalação não calculada — não é possível propor o dispositivo geral.'],
+      dadosFaltantes: ['demanda da instalação'],
+      decisao: criarDecisionRecord('GERAL-01', 'Seleção do dispositivo geral', demanda, null, CLASSIFICACAO_DECISAO.PENDENTE_ESPECIFICACAO, 'sem demanda calculada — sem base para propor o geral', 'n/a', [], ['demanda da instalação'], ['pendente'], true),
+    };
+  }
+
+  const inGeralPreliminar = escolherDisjuntor(demanda.correnteDemandaA, Infinity);
+  if (inGeralPreliminar === null) {
+    alertas.push('Não foi possível selecionar um dispositivo dentro da tabela disponível (máximo 1000 A) para a corrente de demanda calculada — revisão obrigatória do responsável técnico (erro crítico, não sugestão).');
+  }
+
+  if (!alimentador || !alimentador.izA) {
+    dadosFaltantes.push('seção/Iz do alimentador geral (comprimento e método de instalação não coletados)');
+    alertas.push('Iz do alimentador geral não determinado — o valor de dispositivo geral abaixo é uma ESTIMATIVA PRELIMINAR, pendente de confirmação de que In_geral ≤ Iz_alimentador.');
+  } else if (inGeralPreliminar !== null && inGeralPreliminar > alimentador.izA) {
+    alertas.push(`In proposto (${inGeralPreliminar} A) excede o Iz do alimentador informado (${alimentador.izA} A) — necessário revisar a seção do alimentador ou a demanda considerada.`);
+  }
+
+  if (!curtoCircuito || !curtoCircuito.iccA) {
+    dadosFaltantes.push('corrente de curto-circuito presumida no ponto de instalação (capacidade de interrupção do dispositivo)');
+    alertas.push('Capacidade de interrupção não verificada — corrente de curto-circuito presumida não informada nesta plataforma. Capacidade de interrupção do dispositivo: a especificar.');
+  }
+
+  const tecnologiaInfo = classificarTecnologiaDispositivo(inGeralPreliminar);
+  const limiar = LIMIARES_HEURISTICOS_GERAL_A[perfil];
+  if (limiar && inGeralPreliminar !== null && inGeralPreliminar > limiar) {
+    alertas.push(`Dispositivo geral de ${inGeralPreliminar} A é incomum para o perfil "${perfil}" — critério interno de projeto configurável (heurística), NÃO é exigência normativa nem de concessionária codificada aqui. Exige revisão do responsável técnico.`);
+  }
+
+  const decisao = criarDecisionRecord(
+    'GERAL-01', 'Seleção do dispositivo geral (preliminar)',
+    { correnteDemandaA: demanda.correnteDemandaA, alimentador: alimentador || null, curtoCircuito: curtoCircuito || null, perfil },
+    { inGeralPreliminar, polos, tecnologia: tecnologiaInfo.tecnologia },
+    dadosFaltantes.length ? CLASSIFICACAO_DECISAO.PENDENTE_ESPECIFICACAO : CLASSIFICACAO_DECISAO.CALCULO_TECNICO,
+    'In escolhido a partir da corrente de demanda (Ib_demanda ≤ In_geral); Iz_alimentador e capacidade de interrupção pendentes nesta plataforma.',
+    'cálculo técnico interno + heurística de plausibilidade por perfil (não normativa)',
+    ['Ib_demanda ≤ In_geral ≤ Iz_alimentador — Iz_alimentador ainda não determinado nesta plataforma.'],
+    dadosFaltantes, alertas, true,
+  );
+
+  return {
+    disjuntorGeral: inGeralPreliminar, polos,
+    tecnologia: tecnologiaInfo.tecnologia, tecnologiaClassificacao: tecnologiaInfo.classificacao, tecnologiaFonte: tecnologiaInfo.fonte,
+    status: dadosFaltantes.length ? 'estimativa-preliminar' : 'calculado',
+    somaIbGeral: demanda.correnteInstaladaEquivalenteA,
+    correnteDemandaA: demanda.correnteDemandaA,
+    alertas, dadosFaltantes, decisao,
+  };
+}
+
+// ---- Palavras-chave para identificar cargas com eletrônica de potência ----
+// Usadas tanto na classificação de obrigatoriedade de DR (tipo de DR não decidido
+// silenciosamente) quanto no agrupamento funcional (Sprint CORE-002C, seção 6-7).
+// IMPORTANTE: 'ev' NÃO entra como substring solta na lista — "elEVador" contém "ev" como
+// substring e seria classificado incorretamente como carregador veicular. Recarga veicular
+// é identificada pela CATEGORIA exata (r-ev/cond-ev/com-ev) ou pelo prefixo 'carregador',
+// nunca por uma substring curta genérica.
+const PALAVRAS_CARGA_ELETRONICA = ['carregador', 'nobreak', 'inversor', 'split', 'inverter', 'chiller', 'condensadora', 'servidor', 'rack'];
+const CATEGORIAS_RECARGA_VEICULAR = ['r-ev', 'cond-ev', 'com-ev'];
+function ehCargaEletronica(circuito) {
+  const cat = (circuito.categoria || '').toLowerCase();
+  const amb = (circuito.ambienteId || '').toLowerCase();
+  const desc = (circuito.descricao || '').toLowerCase();
+  if (CATEGORIAS_RECARGA_VEICULAR.includes(cat)) return true;
+  return PALAVRAS_CARGA_ELETRONICA.some((p) => amb.includes(p) || desc.includes(p));
+}
+function inferirCondicaoUtilizacao(circuito) {
+  const cat = (circuito.categoria || '').toLowerCase();
+  if (ehCargaEletronica(circuito)) {
+    return 'carga com eletrônica de potência (carregador/inversor/nobreak/climatização inverter ou similar)';
+  }
+  if (cat.includes('banheiro')) return 'ambiente com chuveiro/banheira (área molhada)';
+  if (cat.includes('cozinha')) return 'bancada/pia — possível proximidade com água';
+  if (cat.includes('lavanderia')) return 'área de serviço com água corrente';
+  if (cat.includes('externa') || cat.includes('garagem')) return 'circuito de área externa/exposta';
+  return 'sem condição de utilização/exposição identificada nos dados disponíveis';
+}
+
+// ---- Classificação normativa de obrigatoriedade de DR (reescrita — Sprint CORE-002C) ----
+// Não usa mais só o nome do ambiente como evidência — deriva um MOTIVO funcional (área
+// molhada, exposição externa, carga com eletrônica de potência etc.) a partir dos dados já
+// existentes, e nunca trata "banheiro" isoladamente como critério de AGRUPAMENTO (isso é
+// responsabilidade de planejarGruposDR, não desta função).
+// LIMITAÇÃO REGISTRADA: os dados hoje disponíveis (biblioteca de ambientes, campo booleano
+// `dr`) só permitem 3 estados verificáveis com segurança (obrigatório / não identificado /
+// depende de dado, quando a própria categoria do circuito é desconhecida) — não há dado
+// para distinguir "recomendado" com segurança; inventar essa distinção sem fonte real
+// violaria a regra de não inventar exigência normativa, por isso fica registrada como
+// limitação, não simulada.
+function classificarObrigatoriedadeDR(circuito, perfil, local) {
+  local = local || circuito.categoria || circuito.ambienteId || null;
+  const condicao = inferirCondicaoUtilizacao(circuito);
+  const ehEletronica = condicao.startsWith('carga com eletrônica');
+  const dadosFaltantes = ['tipo do ponto (fixo/móvel)', 'confirmação de campo da exposição externa/proximidade com água'];
+
+  if (!circuito.categoria && !circuito.ambienteId) {
+    return {
+      status: 'depende_de_dado',
+      motivo: 'Circuito sem ambiente/categoria associada (provavelmente personalizado, sem seleção de ambiente) — não há dado suficiente para classificar a obrigatoriedade de DR.',
+      referencia: null,
+      dadosFaltantes: ['ambiente/utilização do ponto', ...dadosFaltantes],
+      tipoDRRequerido: null,
+      observacoes: 'Classificação bloqueada por ausência do dado primário (ambiente/utilização) — preencher antes de aprovar o quadro.',
+      classificacao: CLASSIFICACAO_DECISAO.PENDENTE_ESPECIFICACAO,
+      necessitaConfirmacao: true,
+    };
+  }
+
+  if (circuito.exigeDR === true) {
+    return {
+      status: 'obrigatorio',
+      motivo: `Condição de utilização identificada: ${condicao}.`,
+      referencia: 'NBR 5410 — seção 9 (locais específicos) / 9.5 (locais de habitação) / 5.1.3.2 (proteção adicional)',
+      dadosFaltantes,
+      tipoDRRequerido: ehEletronica
+        ? 'Tipo de DR depende das características do equipamento e das instruções do fabricante — não assumido automaticamente (nunca "Tipo A" por padrão silencioso).'
+        : 'Tipo AC (uso geral) — recomendação de projeto a confirmar; não é seleção definitiva de fabricante.',
+      observacoes: 'Classificação derivada da biblioteca de ambientes deste produto (indicador previamente calibrado por uso/categoria) — sujeita à validação de campo do responsável técnico.',
+      classificacao: CLASSIFICACAO_DECISAO.RECOMENDACAO_PROJETO,
+      necessitaConfirmacao: true,
+    };
+  }
+  return {
+    status: 'nao_identificado',
+    motivo: `Nenhuma condição de utilização de risco foi identificada nos dados disponíveis (${condicao}) — isso não é, por si só, uma dispensa normativa.`,
+    referencia: null,
+    dadosFaltantes,
+    tipoDRRequerido: null,
+    observacoes: 'Ausência de regra codificada para este caso específico — não confirma nem descarta a exigência real de campo. Estado "recomendado" não é oferecido por falta de dado que o distinga com segurança de "obrigatório"/"não identificado".',
+    classificacao: CLASSIFICACAO_DECISAO.PENDENTE_ESPECIFICACAO,
+    necessitaConfirmacao: true,
+  };
+}
+
+// ---- Grupos funcionais de DR (reescrita — Sprint CORE-002C) ----
+// ELIMINA o agrupamento por categoria de cômodo (sala/quarto/cozinha/banheiro), apontado
+// como problema na validação anterior. Agrupa por FUNÇÃO da carga, usando os mesmos dados
+// reais já disponíveis (categoria, ambienteId, descrição, emergência, corrente):
+//   - "Cargas críticas/emergência" — iluminação de emergência centralizada, isolada para
+//     preservar continuidade (nunca divide DR com cargas gerais).
+//   - "Cargas eletrônicas específicas" — carregador EV, nobreak, inversor, climatização
+//     inverter e similares (o TIPO de DR não é decidido aqui — ver classificarObrigatorie-
+//     dadeDR — apenas o agrupamento funcional).
+//   - "Tomadas e áreas molhadas" — circuitos de banheiro/cozinha/lavanderia.
+//   - "Cargas externas" — circuitos de área externa/garagem exposta.
+//   - "Serviços auxiliares" — demais circuitos com DR que não se encaixam acima.
+// Dentro de cada grupo funcional, um novo DR só começa quando a soma de Ib do grupo atual
+// ultrapassaria a maior corrente de DR disponível — limite ELÉTRICO, nunca contagem fixa
+// nem nome de cômodo. O nome funcional é anexado como propriedade do array do grupo (não
+// muda o formato consumido por gerarSVGQuadro()/gerarBOMConsolidada(), que continuam
+// tratando cada grupo como um array simples de circuitos, sem nenhuma alteração nelas).
+function classificarGrupoFuncionalDR(circuito) {
+  const cat = (circuito.categoria || '').toLowerCase();
+  if (circuito.emergencia === 'centralizada') return 'Cargas críticas/emergência';
+  if (ehCargaEletronica(circuito)) return 'Cargas eletrônicas específicas';
+  if (cat.includes('banheiro') || cat.includes('cozinha') || cat.includes('lavanderia')) return 'Tomadas e áreas molhadas';
+  if (cat.includes('externa') || cat.includes('garagem')) return 'Cargas externas';
+  return 'Serviços auxiliares';
+}
+function planejarGruposDR(circuitosClassificados, dadosInstalacao) {
+  dadosInstalacao = dadosInstalacao || {};
+  const correnteMaximaPorGrupoA = dadosInstalacao.correnteMaximaPorGrupoA || DR_RATINGS[DR_RATINGS.length - 1];
+
+  const porFuncao = new Map();
+  circuitosClassificados.forEach((c) => {
+    const chave = classificarGrupoFuncionalDR(c);
+    if (!porFuncao.has(chave)) porFuncao.set(chave, []);
+    porFuncao.get(chave).push(c);
+  });
+
   const grupos = [];
-  for (let i = 0; i < lista.length; i += tamanhoGrupo) grupos.push(lista.slice(i, i + tamanhoGrupo));
+  porFuncao.forEach((lista, nomeFuncional) => {
+    let grupoAtual = [];
+    let somaIbAtual = 0;
+    const fecharGrupo = () => {
+      if (!grupoAtual.length) return;
+      grupoAtual.nomeFuncional = nomeFuncional; // propriedade extra num array — não afeta forEach/reduce/length usados por gerarSVGQuadro/gerarBOMConsolidada
+      grupos.push(grupoAtual);
+    };
+    lista.forEach((c) => {
+      const ib = c.resultado.ib;
+      if (grupoAtual.length && somaIbAtual + ib > correnteMaximaPorGrupoA) {
+        fecharGrupo();
+        grupoAtual = [];
+        somaIbAtual = 0;
+      }
+      grupoAtual.push(c);
+      somaIbAtual += ib;
+    });
+    fecharGrupo();
+  });
   return grupos;
+}
+
+/* ============ PLANEJADOR NORMATIVO DO QUADRO (Sprints CORE-002 / CORE-002C) ============
+   Este bloco cria um PLANO elétrico do quadro (dados) ANTES de qualquer desenho — o
+   renderizador (gerarSVGQuadro/gerarBOMConsolidada, ambos intocados) não lê nada daqui.
+   A Sprint CORE-002C corrigiu decisões elétricas confirmadas como problemáticas na
+   validação (disjuntor geral pela soma direta de Ib, DR agrupado por cômodo, heurísticas
+   apresentadas como norma) — ver classificarObrigatoriedadeDR(), planejarGruposDR(),
+   calcularDemandaInstalacao() e planejarDispositivoGeral() acima. */
+
+// ---- Conjunto de DPS do quadro principal (reescrita — Sprint CORE-002C) ----
+// Não decide mais a configuração apenas por mono/bi/trifásico: exige também o esquema de
+// aterramento (TN-S/TN-C-S/TT/outro). Esta plataforma ainda não coleta esse dado em
+// nenhuma tela (fora do escopo desta Sprint criar essa tela) — por isso o resultado é
+// SEMPRE uma configuração PRELIMINAR/pendente enquanto esse dado não existir, nunca uma
+// seleção definitiva de polos/módulos.
+function planejarConjuntoDPS(dadosInstalacao) {
+  dadosInstalacao = dadosInstalacao || {};
+  const tipoEntrada = dadosInstalacao.tipoEntrada;
+  const esquemaAterramento = dadosInstalacao.esquemaAterramento || null;
+  const fases = FASES_POR_ENTRADA[tipoEntrada];
+  const dadosFaltantes = [];
+  const alertas = [];
+
+  if (!fases) {
+    return {
+      status: 'pendente', esquemaConexao: null, quantidadePolos: null, quantidadeModulos: null, classe: 'a especificar',
+      Uc: 'a especificar', In: 'a especificar', Imax: 'a especificar',
+      dadosAEspecificar: ['esquemaConexao', 'quantidadePolos', 'classe', 'Uc', 'In', 'Imax', 'esquemaAterramento'],
+      justificativa: 'Tipo de entrada não reconhecido — não é possível propor nem preliminarmente o DPS.',
+      alertas: ['Tipo de entrada ausente ou inválido — conjunto de DPS não pôde ser planejado.'],
+      dadosFaltantes: ['tipoEntrada', 'esquemaAterramento'],
+      decisao: criarDecisionRecord('DPS-01', 'Conjunto de DPS do quadro principal', dadosInstalacao, null, CLASSIFICACAO_DECISAO.PENDENTE_ESPECIFICACAO, 'sem tipo de entrada válido', 'n/a', [], ['tipoEntrada', 'esquemaAterramento'], ['pendente'], true),
+    };
+  }
+  if (!esquemaAterramento) {
+    dadosFaltantes.push('esquema de aterramento (TN-S, TN-C-S, TT ou outro)');
+    alertas.push('Esquema do DPS pendente da definição do aterramento — esta plataforma ainda não coleta esse dado; a configuração abaixo é PRELIMINAR, baseada apenas no número de fases + neutro.');
+  }
+
+  const quantidadePolos = POLOS_GERAL_POR_ENTRADA[tipoEntrada];
+  const quantidadeModulos = quantidadePolos >= 4 ? 4 : 2;
+  const status = esquemaAterramento ? 'preliminar-com-aterramento' : 'preliminar-sem-aterramento';
+
+  const decisao = criarDecisionRecord(
+    'DPS-01', 'Conjunto de DPS do quadro principal',
+    { tipoEntrada, esquemaAterramento },
+    { quantidadePolos, quantidadeModulos, status },
+    esquemaAterramento ? CLASSIFICACAO_DECISAO.CALCULO_TECNICO : CLASSIFICACAO_DECISAO.PENDENTE_ESPECIFICACAO,
+    'Polos/módulos derivados do número de fases + neutro do esquema de entrada; configuração definitiva depende do esquema de aterramento e de dados de fabricante (Uc/In/Imax).',
+    'cálculo técnico interno (preliminar)',
+    ['Um único conjunto de DPS no quadro principal — nunca um conjunto por circuito nem por grupo de DR.'],
+    ['Uc', 'In', 'Imax', ...dadosFaltantes], alertas, true,
+  );
+
+  return {
+    status,
+    esquemaConexao: `PRELIMINAR: ${fases.length} fase(s) + neutro, instalado em paralelo ao disjuntor geral (modo comum — NBR 5410 6.3.5.2) — esquema de aterramento: ${esquemaAterramento || 'não informado (pendente)'}`,
+    quantidadePolos, quantidadeModulos,
+    classe: 'Classe II (referência de projeto usual — a confirmar pelo responsável técnico conforme exposição a descargas atmosféricas e o esquema de aterramento real)',
+    Uc: 'a especificar', In: 'a especificar', Imax: 'a especificar',
+    dadosAEspecificar: ['Uc', 'In', 'Imax', ...dadosFaltantes],
+    justificativa: 'Um único conjunto de DPS no quadro principal, dimensionado pelo número de fases + neutro — nunca um conjunto por circuito nem por grupo de DR. Configuração definitiva depende do esquema de aterramento.',
+    dadosFaltantes,
+    alertas,
+    decisao,
+  };
+}
+
+// ---- Balanceamento de carga entre fases (4.2.5.6) — ajustada (Sprint CORE-002C) ----
+// Mantém o algoritmo por MENOR carga acumulada (critério de carga real, nunca alternância
+// de sequência — já correto antes desta Sprint). O que muda: o limiar de alerta agora é
+// explicitamente configurável (dadosInstalacao.limiteAlertaPercentual) e o texto do alerta
+// deixa claro que é critério interno de projeto, nunca um limite geral da NBR 5410.
+// Circuitos trifásicos carregam as três fases simultaneamente; não existe hoje, nesta
+// plataforma, um tipo de circuito genuinamente bifásico F-F (2 polos) — lacuna já
+// registrada em docs/RFC-001-TECHNICAL-RENDERING-ENGINE.md (seção 11, risco 1).
+function balancearCircuitosPorFase(circuitos, fases, dadosInstalacao) {
+  dadosInstalacao = dadosInstalacao || {};
+  const limiteAlertaPercentual = dadosInstalacao.limiteAlertaPercentual || 20;
+  const rotulos = fases.map((f) => f.label);
+  const cargaPorFase = {};
+  rotulos.forEach((r) => { cargaPorFase[r] = 0; });
+
+  const tabela = circuitos.map((c) => {
+    const ib = c.resultado.ib;
+    let faseAtribuida;
+    if (c.params.sistema === 'trifasico') {
+      faseAtribuida = rotulos.join('+');
+      rotulos.forEach((r) => { cargaPorFase[r] += ib; });
+    } else if (rotulos.length === 1) {
+      faseAtribuida = rotulos[0];
+      cargaPorFase[rotulos[0]] += ib;
+    } else {
+      faseAtribuida = rotulos.reduce((menor, r) => (cargaPorFase[r] < cargaPorFase[menor] ? r : menor), rotulos[0]);
+      cargaPorFase[faseAtribuida] += ib;
+    }
+    return { circuitoId: c.id, descricao: c.descricao, ib, faseAtribuida };
+  });
+
+  const valores = rotulos.map((r) => cargaPorFase[r]);
+  const maiorCarga = Math.max(...valores);
+  const menorCarga = Math.min(...valores);
+  const diferencaAbsoluta = +(maiorCarga - menorCarga).toFixed(2);
+  const desequilibrioPercentual = maiorCarga > 0 ? +((diferencaAbsoluta / maiorCarga) * 100).toFixed(1) : 0;
+
+  const alertas = [];
+  if (rotulos.length > 1 && desequilibrioPercentual > limiteAlertaPercentual) {
+    alertas.push(`Alerta de balanceamento conforme critério interno configurado (limite = ${limiteAlertaPercentual}%), NÃO é limite geral da NBR 5410 — desequilíbrio calculado: ${desequilibrioPercentual}% (maior fase ${maiorCarga.toFixed(2)}A, menor ${menorCarga.toFixed(2)}A).`);
+  }
+  if (rotulos.length === 1) {
+    alertas.push('Entrada monofásica — balanceamento entre fases não se aplica (uma única fase disponível).');
+  }
+
+  const decisao = criarDecisionRecord(
+    'BAL-01', 'Balanceamento de circuitos entre fases',
+    { totalCircuitos: circuitos.length, fases: rotulos },
+    { porFase: cargaPorFase, desequilibrioPercentual },
+    CLASSIFICACAO_DECISAO.HEURISTICA_CONFIGURAVEL,
+    'Alocação gulosa por menor carga acumulada; alerta de desequilíbrio por limiar configurável (não normativo).',
+    'critério interno de projeto, configurável pelo responsável técnico',
+    ['limiteAlertaPercentual é um critério de projeto, não um valor da NBR 5410.'],
+    [], alertas, true,
+  );
+
+  return { porFase: cargaPorFase, maiorCarga, menorCarga, diferencaAbsoluta, desequilibrioPercentual, limiteAlertaPercentual, alertas, tabela, decisao };
+}
+
+// ---- Reserva de espaço — Tabela 59 ----
+function calcularReservaTabela59(numCircuitos) {
+  let reservaMinimaCircuitos, criterioAplicado;
+  if (numCircuitos <= 6) { reservaMinimaCircuitos = 2; criterioAplicado = 'até 6 circuitos → reserva mínima de 2 (tabela 59)'; }
+  else if (numCircuitos <= 12) { reservaMinimaCircuitos = 3; criterioAplicado = '7 a 12 circuitos → reserva mínima de 3 (tabela 59)'; }
+  else if (numCircuitos <= 30) { reservaMinimaCircuitos = 4; criterioAplicado = '13 a 30 circuitos → reserva mínima de 4 (tabela 59)'; }
+  else { reservaMinimaCircuitos = Math.ceil(numCircuitos * 0.15); criterioAplicado = `acima de 30 circuitos → reserva mínima de 15% (tabela 59) = ${reservaMinimaCircuitos}`; }
+
+  // A norma expressa a reserva em CIRCUITOS, nunca em módulos — premissa explícita e
+  // conservadora para converter: cada circuito de reserva é assumido monopolar (1 módulo),
+  // já que não se sabe hoje o número de polos dos circuitos futuros.
+  return {
+    reservaMinimaCircuitos,
+    reservaMinimaModulos: reservaMinimaCircuitos,
+    criterioAplicado,
+    premissaConversao: 'cada circuito de reserva assumido como monopolar (1 módulo) — premissa conservadora, não normativa.',
+    referenciaNormativa: 'NBR 5410, Tabela 59',
+  };
+}
+
+// ---- Biblioteca dimensional modular (unidade lógica de largura) ----
+// Dimensões visuais detalhadas ficam para uma Sprint futura — aqui só se calcula ocupação.
+const MODULOS_POR_POLO_MCB = { 1: 1, 2: 2, 3: 3, 4: 4 };
+function modulosMCB(polos) { return MODULOS_POR_POLO_MCB[polos] || polos; }
+function modulosDR(polos) { return MODULOS_POR_POLO_MCB[polos] || polos; }
+function modulosDPS(quantidadeModulos) { return quantidadeModulos || 0; }
+
+// ---- (planejarDisjuntorGeral removida na Sprint CORE-002C — substituída por
+//       planejarDispositivoGeral(), que separa demanda/alimentador/curto-circuito e nunca
+//       seleciona o geral pela soma direta de Ib; ver definição no topo deste bloco.) ----
+
+// ---- Arquitetura física de quadros ----
+// Reaproveita a MESMA separação de sub-quadros já existente no produto
+// (detectarSubQuadros(), baseada em categoria/ambienteId real — CFTV e Casa Inteligente),
+// em vez de inventar QD-01/QD-02 arbitrários. A plataforma não coleta hoje nenhum dado de
+// localização física (pavimento, setor, distância) — sem esse dado, dividir fisicamente o
+// quadro geral seria invenção, não decisão técnica. O quadro geral permanece ÚNICO (QDG);
+// a única divisão proposta é a que já tem justificativa funcional real no produto.
+function planejarArquiteturaDeQuadros(circuitos) {
+  const subQuadros = detectarSubQuadros(circuitos);
+  const idsEmSubQuadro = new Set(subQuadros.flatMap((g) => g.circuitos.map((c) => c.id)));
+  const circuitosQDG = circuitos.filter((c) => !idsEmSubQuadro.has(c.id));
+
+  const quadros = [{
+    id: 'QDG', nome: 'QDG — Quadro de Distribuição Geral', circuitos: circuitosQDG,
+    justificativa: 'Quadro principal — recebe todos os circuitos sem justificativa funcional para um quadro dedicado.',
+  }];
+  subQuadros.forEach((g) => {
+    quadros.push({
+      id: 'QD-' + g.id.toUpperCase(), nome: g.titulo, circuitos: g.circuitos,
+      justificativa: `Quadro dedicado por função já reconhecida no produto (categoria/ambiente = "${g.id}"), alimentado por alimentador a partir do QDG — não criado por limite de espaço de desenho.`,
+    });
+  });
+
+  const alertas = [];
+  const totalModulosQDG = circuitosQDG.reduce((s, c) => s + modulosMCB(c.params.sistema === 'trifasico' ? 3 : 1), 0);
+  if (escolherQuadro(totalModulosQDG) === null) {
+    alertas.push(`O QDG ocupa ${totalModulosQDG} módulos de circuitos, acima do maior gabinete comercial padrão desta plataforma (${QUADRO_TAMANHOS[QUADRO_TAMANHOS.length - 1]}). Dividir fisicamente em QD-01/QD-02 exigiria dado de localização/pavimento que esta plataforma não coleta hoje — não inventado. Revisão do responsável técnico necessária.`);
+  }
+  return { quadros, alertas };
+}
+
+// ---- Distribuição em trilhos DIN (Adendo à Sprint CORE-002) ----
+// A NBR 5410 não define capacidade física de trilho — isso é dado de produto/catálogo,
+// que esta plataforma ainda não coleta (lacuna já registrada em
+// docs/TECHNICAL_RENDERING_ENGINE.md, seção 9). Para poder calcular "número de trilhos"
+// sem inventar uma exigência normativa, usa-se uma referência GENÉRICA de mercado (12
+// módulos por trilho — capacidade comum em trilhos DIN de gabinetes pequenos/médios),
+// explicitamente marcada como não normativa e substituível por dado real de catálogo do
+// gabinete escolhido assim que existir.
+const CAPACIDADE_MODULOS_POR_TRILHO_GENERICA = 12;
+function calcularDistribuicaoEmTrilhos(modulosOcupados, modulosReserva) {
+  const totalModulos = modulosOcupados + modulosReserva;
+  const numeroTrilhos = Math.ceil(totalModulos / CAPACIDADE_MODULOS_POR_TRILHO_GENERICA);
+  return {
+    capacidadeModulosPorTrilho: CAPACIDADE_MODULOS_POR_TRILHO_GENERICA,
+    numeroTrilhos,
+    premissa: `Referência genérica de mercado (${CAPACIDADE_MODULOS_POR_TRILHO_GENERICA} módulos/trilho) — não é valor normativo da NBR 5410; substituir pelo dado real do gabinete/catálogo assim que disponível.`,
+  };
+}
+
+// ---- Orquestrador: monta o PanelPlan (reescrito — Sprint CORE-002C) ----
+// Fluxo: circuitos dimensionados → demanda da instalação → classificação normativa de DR →
+// balanceamento de fases → arquitetura de proteção (geral/DPS/DR) → ocupação modular +
+// reserva → seleção de gabinete → arquitetura de quadros. NADA disto é lido por
+// gerarSVGQuadro()/gerarBOMConsolidada() — o renderizador continua exatamente como estava.
+function planejarQuadro(circuitos, tipoEntrada, perfil, dadosInstalacao) {
+  dadosInstalacao = dadosInstalacao || {};
+  perfil = perfil || 'residencial';
+  const fases = FASES_POR_ENTRADA[tipoEntrada] || FASES_POR_ENTRADA.monofasica;
+  const premissasNormativas = [];
+  const alertas = [];
+  const decisoes = [];
+
+  const circuitosClassificados = circuitos.map((c) => ({ ...c, classificacaoDR: classificarObrigatoriedadeDR(c, perfil, c.categoria) }));
+  premissasNormativas.push('Classificação de DR usa 3 estados verificáveis (obrigatório / não identificado / depende de dado) — os dados atuais não permitem distinguir "recomendado" com segurança; ver limitação registrada no código.');
+
+  const demanda = calcularDemandaInstalacao({}, circuitos, dadosInstalacao);
+  decisoes.push(demanda.decisao);
+
+  const balanceamento = balancearCircuitosPorFase(circuitos, fases, dadosInstalacao);
+  decisoes.push(balanceamento.decisao);
+
+  const geral = planejarDispositivoGeral(demanda, dadosInstalacao.alimentador || null, dadosInstalacao.curtoCircuito || null, { tipoEntrada, perfil });
+  decisoes.push(geral.decisao);
+
+  const conjuntoDPS = planejarConjuntoDPS({ tipoEntrada, esquemaAterramento: dadosInstalacao.esquemaAterramento });
+  decisoes.push(conjuntoDPS.decisao);
+
+  const circuitosParaDR = circuitosClassificados.filter((c) => c.classificacaoDR.status === 'obrigatorio');
+  const gruposDR = planejarGruposDR(circuitosParaDR, dadosInstalacao).map((grupo, i) => {
+    const somaIb = grupo.reduce((s, c) => s + c.resultado.ib, 0);
+    const idr = escolherIDR(somaIb);
+    const polos = grupo.some((c) => c.params.sistema === 'trifasico') ? 4 : 2;
+    const nomeFuncional = grupo.nomeFuncional || 'Grupo geral protegido';
+    const contemEletronica = grupo.some((c) => (c.classificacaoDR && c.classificacaoDR.tipoDRRequerido && c.classificacaoDR.tipoDRRequerido.startsWith('Tipo de DR depende')));
+    const decisaoGrupo = criarDecisionRecord(
+      `DR-GRUPO-${String(i + 1).padStart(2, '0')}`, `Agrupamento funcional de DR — ${nomeFuncional}`,
+      { circuitos: grupo.map((c) => c.id), somaIbA: +somaIb.toFixed(2) },
+      { idr, polos, correnteEstimadaGrupoA: +somaIb.toFixed(2) },
+      CLASSIFICACAO_DECISAO.RECOMENDACAO_PROJETO,
+      'Agrupamento por função da carga (não por cômodo) + limite elétrico pela maior corrente de DR disponível.',
+      'proposta de agrupamento automático — sujeita à validação do responsável técnico',
+      ['Corrente de fuga acumulada não calculada — esta plataforma não coleta esse dado.'],
+      contemEletronica ? ['tipo de DR (depende do equipamento/fabricante)'] : [],
+      idr === null ? [`Corrente somada do grupo (${somaIb.toFixed(2)} A) excede o maior DR disponível (${DR_RATINGS[DR_RATINGS.length - 1]} A) — necessário dividir manualmente.`] : [],
+      true,
+    );
+    return {
+      id: `DR-${String(i + 1).padStart(2, '0')}`,
+      nome: `Grupo DR ${i + 1} — ${nomeFuncional}`,
+      nomeFuncional,
+      tipo: contemEletronica ? 'DR — tipo a especificar (carga com eletrônica de potência)' : 'DR (alta sensibilidade)',
+      polos,
+      correnteNominal: idr,
+      sensibilidade: '30 mA',
+      circuitos: grupo.map((c) => c.id),
+      correnteEstimadaGrupoA: +somaIb.toFixed(2),
+      correnteFugaAcumulada: 'não calculada — dado não coletado por esta plataforma',
+      justificativa: `Circuitos agrupados por função ("${nomeFuncional}"), não por cômodo; corrente somada (${somaIb.toFixed(2)} A) compatível com um único DR de ${idr ?? '> ' + DR_RATINGS[DR_RATINGS.length - 1]} A — proposta de agrupamento automático, sujeita à validação do responsável técnico.`,
+      alertas: decisaoGrupo.alertas,
+      dadosFaltantes: decisaoGrupo.dadosFaltantes,
+      decisao: decisaoGrupo,
+    };
+  });
+  decisoes.push(...gruposDR.map((g) => g.decisao));
+  const circuitosSemDR = circuitosClassificados.filter((c) => c.classificacaoDR.status !== 'obrigatorio');
+
+  const modulosGeral = geral.polos >= 4 ? 4 : (geral.polos || 2);
+  const modulosDPSTotal = modulosDPS(conjuntoDPS.quantidadeModulos);
+  const modulosDRTotal = gruposDR.reduce((s, g) => s + modulosDR(g.polos), 0);
+  const modulosCircuitos = circuitos.reduce((s, c) => s + modulosMCB(c.params.sistema === 'trifasico' ? 3 : 1), 0);
+  const modulosOcupados = modulosGeral + modulosDPSTotal + modulosDRTotal + modulosCircuitos;
+  const reserva = calcularReservaTabela59(circuitos.length);
+  const modulosReserva = reserva.reservaMinimaModulos;
+  const capacidadeGabinete = escolherQuadro(modulosOcupados + modulosReserva);
+  if (capacidadeGabinete === null) {
+    alertas.push(`Módulos ocupados + reserva (${modulosOcupados + modulosReserva}) excedem o maior gabinete comercial padrão (${QUADRO_TAMANHOS[QUADRO_TAMANHOS.length - 1]} módulos). Revisão obrigatória do responsável técnico.`);
+  }
+  const trilhos = calcularDistribuicaoEmTrilhos(modulosOcupados, modulosReserva);
+  premissasNormativas.push(trilhos.premissa);
+
+  const arquiteturaQuadros = planejarArquiteturaDeQuadros(circuitos);
+  alertas.push(...geral.alertas, ...conjuntoDPS.alertas, ...balanceamento.alertas, ...arquiteturaQuadros.alertas, ...demanda.alertas);
+
+  return {
+    id: 'QDG', nome: 'Quadro de Distribuição Geral', perfil, tipoEntrada,
+    esquemaAterramento: dadosInstalacao.esquemaAterramento || 'a especificar (não coletado pela plataforma hoje)',
+    tensaoFaseNeutro: circuitos[0] ? circuitos[0].params.tensao : null,
+    tensaoFaseFase: null,
+    fases: fases.map((f) => f.label),
+    demanda,
+    disjuntorGeral: geral,
+    conjuntoDPS,
+    gruposDR,
+    circuitosSemDR: circuitosSemDR.map((c) => c.id),
+    circuitosPorFase: balanceamento,
+    barramentos: { neutro: true, pe: true },
+    modulosOcupados,
+    modulosReserva,
+    capacidadeGabinete,
+    numeroTrilhos: trilhos.numeroTrilhos,
+    capacidadeModulosPorTrilho: trilhos.capacidadeModulosPorTrilho,
+    quadrosDerivados: arquiteturaQuadros.quadros,
+    alertas,
+    premissasNormativas,
+    circuitosClassificados,
+    decisoes,
+  };
+}
+
+// ---- Visualização temporária de auditoria (não redesenha o quadro) — Sprint CORE-002C ----
+function renderizarAuditoriaPlano(plan) {
+  const linhaAlerta = (a) => `<li>${escaparXML(a)}</li>`;
+
+  const tabelaDemanda = `
+    <table class="bom-table"><tbody>
+      <tr><td>Carga instalada</td><td>${plan.demanda.cargaInstaladaW} W</td></tr>
+      <tr><td>Corrente instalada equivalente</td><td>${plan.demanda.correnteInstaladaEquivalenteA} A</td></tr>
+      <tr><td>Demanda considerada</td><td>${escaparXML(plan.demanda.demandaConsiderada)}</td></tr>
+      <tr><td>Método utilizado</td><td>${escaparXML(plan.demanda.metodoUtilizado)}</td></tr>
+      <tr><td>Fator de demanda</td><td>${plan.demanda.fatorDemanda} (${escaparXML(plan.demanda.fonteFator)})</td></tr>
+      <tr><td>Corrente de demanda</td><td>${plan.demanda.correnteDemandaA} A</td></tr>
+      <tr><td>Seção do alimentador</td><td>${escaparXML(String(plan.demanda.alimentador.secao))}</td></tr>
+      <tr><td>Iz do alimentador</td><td>${escaparXML(String(plan.demanda.alimentador.iz))}</td></tr>
+      <tr><td>Disjuntor geral proposto</td><td>${plan.disjuntorGeral.disjuntorGeral ?? '— (pendente)'} A — ${escaparXML(plan.disjuntorGeral.status)} — ${escaparXML(plan.disjuntorGeral.tecnologia)}</td></tr>
+      <tr><td>Limitações</td><td>${plan.demanda.limitacoes.map(escaparXML).join('; ')}</td></tr>
+    </tbody></table>`;
+
+  const tabelaGruposDR = plan.gruposDR.length
+    ? `<table class="bom-table"><thead><tr><th>Grupo</th><th>Função</th><th>Polos</th><th>Corrente</th><th>Sensibilidade</th><th>Tipo</th><th>Circuitos</th><th>Fuga acumulada</th><th>Justificativa</th></tr></thead><tbody>${
+        plan.gruposDR.map((g) => `<tr><td>${g.id}</td><td>${escaparXML(g.nomeFuncional)}</td><td>${g.polos}</td><td>${g.correnteNominal ?? '—'} A</td><td>${g.sensibilidade}</td><td>${escaparXML(g.tipo)}</td><td>${g.circuitos.length}</td><td>${escaparXML(g.correnteFugaAcumulada)}</td><td>${escaparXML(g.justificativa)}</td></tr>`).join('')
+      }</tbody></table>`
+    : '<p class="field-hint">Nenhum circuito classificado como obrigatório sob DR neste levantamento.</p>';
+
+  const tabelaDPS = `
+    <table class="bom-table"><tbody>
+      <tr><td>Status</td><td>${escaparXML(plan.conjuntoDPS.status)}</td></tr>
+      <tr><td>Esquema de conexão</td><td>${escaparXML(plan.conjuntoDPS.esquemaConexao || '—')}</td></tr>
+      <tr><td>Polos</td><td>${plan.conjuntoDPS.quantidadePolos ?? '—'}</td></tr>
+      <tr><td>Módulos</td><td>${plan.conjuntoDPS.quantidadeModulos ?? '—'}</td></tr>
+      <tr><td>Classe</td><td>${escaparXML(String(plan.conjuntoDPS.classe))}</td></tr>
+      <tr><td>Uc</td><td>${escaparXML(String(plan.conjuntoDPS.Uc))}</td></tr>
+      <tr><td>In</td><td>${escaparXML(String(plan.conjuntoDPS.In))}</td></tr>
+      <tr><td>Imax</td><td>${escaparXML(String(plan.conjuntoDPS.Imax))}</td></tr>
+    </tbody></table>`;
+
+  const tabelaBalanceamento = `
+    <table class="bom-table"><thead><tr><th>Fase</th><th>Carga acumulada (A)</th></tr></thead><tbody>
+      ${Object.entries(plan.circuitosPorFase.porFase).map(([f, v]) => `<tr><td>${f}</td><td>${v.toFixed(2)}</td></tr>`).join('')}
+    </tbody></table>
+    <p class="field-hint">Maior: ${plan.circuitosPorFase.maiorCarga.toFixed(2)} A · Menor: ${plan.circuitosPorFase.menorCarga.toFixed(2)} A · Diferença: ${plan.circuitosPorFase.diferencaAbsoluta.toFixed(2)} A · Desequilíbrio: ${plan.circuitosPorFase.desequilibrioPercentual}% (limiar de alerta configurado: ${plan.circuitosPorFase.limiteAlertaPercentual}% — critério interno, não NBR 5410)</p>
+    <table class="bom-table"><thead><tr><th>Circuito</th><th>Ib (A)</th><th>Fase</th></tr></thead><tbody>
+      ${plan.circuitosPorFase.tabela.map((l) => `<tr><td>${escaparXML(l.descricao)}</td><td>${l.ib.toFixed(2)}</td><td>${l.faseAtribuida}</td></tr>`).join('')}
+    </tbody></table>`;
+
+  const tabelaOcupacao = `
+    <table class="bom-table"><tbody>
+      <tr><td>Módulos ocupados</td><td>${plan.modulosOcupados}</td></tr>
+      <tr><td>Módulos de reserva (tabela 59)</td><td>${plan.modulosReserva}</td></tr>
+      <tr><td>Número de trilhos (ref. genérica ${plan.capacidadeModulosPorTrilho} módulos/trilho — não normativa)</td><td>${plan.numeroTrilhos}</td></tr>
+      <tr><td>Capacidade de gabinete selecionada</td><td>${plan.capacidadeGabinete ?? '— (excede o maior gabinete padrão)'}</td></tr>
+    </tbody></table>`;
+
+  const tabelaQuadros = `
+    <table class="bom-table"><thead><tr><th>Quadro</th><th>Circuitos</th><th>Justificativa</th></tr></thead><tbody>
+      ${plan.quadrosDerivados.map((q) => `<tr><td>${q.id}</td><td>${q.circuitos.length}</td><td>${escaparXML(q.justificativa)}</td></tr>`).join('')}
+    </tbody></table>
+    <p class="field-hint">Confirmado: nenhum "Bloco 1 de N" — cada quadro acima é uma unidade física própria, nunca um recorte visual do mesmo quadro.</p>`;
+
+  const tabelaDecisoes = plan.decisoes.length
+    ? `<table class="bom-table"><thead><tr><th>ID</th><th>Assunto</th><th>Classificação</th><th>Regra/Fonte</th><th>Dados faltantes</th><th>Exige validação</th></tr></thead><tbody>${
+        plan.decisoes.map((d) => `<tr><td>${d.id}</td><td>${escaparXML(d.assunto)}</td><td>${escaparXML(d.classificacao)}</td><td>${escaparXML(d.regra)} — ${escaparXML(d.fonte)}</td><td>${d.dadosFaltantes.map(escaparXML).join('; ') || '—'}</td><td>${d.exigeValidacao ? 'Sim' : 'Não'}</td></tr>`).join('')
+      }</tbody></table>`
+    : '';
+
+  const alertasHTML = plan.alertas.length ? `<ul>${plan.alertas.map(linhaAlerta).join('')}</ul>` : '<p class="field-hint">Nenhum alerta.</p>';
+  const premissasHTML = plan.premissasNormativas.length ? `<ul>${plan.premissasNormativas.map(linhaAlerta).join('')}</ul>` : '';
+
+  return `
+    <div class="panel" style="border: 2px dashed var(--orange); margin-bottom: 22px;">
+      <div class="section-title"><h2>Auditoria do Planejador (Beta — Sprint CORE-002C)</h2></div>
+      <div class="field-hint" style="margin-bottom:14px;">Visualização temporária de validação técnica — não substitui o desenho do quadro abaixo, que continua gerado exatamente como antes. Esta seção mostra o PLANO que alimentará o renderizador numa Sprint futura.</div>
+
+      <div class="bom-group-title">Demanda da instalação</div>
+      ${tabelaDemanda}
+
+      <div class="bom-group-title">A. Quadro proposto</div>
+      ${tabelaOcupacao}
+
+      <div class="bom-group-title">B. Proteção</div>
+      <div class="bom-group-title" style="font-size:12px;">Conjunto DPS</div>
+      ${tabelaDPS}
+      <div class="bom-group-title" style="font-size:12px;">Grupos DR (funcionais — não por cômodo)</div>
+      ${tabelaGruposDR}
+      <p class="field-hint">Circuitos sem exigência de DR identificada: ${plan.circuitosSemDR.length}</p>
+
+      <div class="bom-group-title">C. Balanceamento de fases</div>
+      ${tabelaBalanceamento}
+
+      <div class="bom-group-title">D. Distribuição por quadro</div>
+      ${tabelaQuadros}
+
+      <div class="bom-group-title">Registro de decisões (DecisionRecord)</div>
+      ${tabelaDecisoes}
+
+      <div class="bom-group-title">Alertas normativos e de plausibilidade</div>
+      ${alertasHTML}
+
+      <div class="bom-group-title">Premissas registradas</div>
+      ${premissasHTML}
+    </div>
+  `;
+}
+
+/* ============ MOTOR DE ARQUITETURA FÍSICA DO QUADRO (Sprint CORE-003) ============
+   Physical Panel Layout Engine — constrói toda a estrutura física do quadro EM MEMÓRIA
+   (lista de componentes, ocupação por trilho, gabinete comercial escolhido) a partir do
+   PanelPlan já produzido pelo Electrical Decision Engine (CORE-002/CORE-002C). Este motor
+   NÃO desenha nada e NÃO decide nenhuma questão elétrica (quantidade de DR, DPS, disjuntor
+   geral, grupos, fases) — ele só consome o que o planejador já decidiu e organiza a
+   GEOMETRIA LÓGICA (módulos, trilhos, gabinete). gerarSVGQuadro()/gerarBOMConsolidada()
+   continuam exatamente como estavam; nenhuma delas lê nada deste bloco ainda — isso fica
+   para uma Sprint futura de integração (depois de CORE-004). */
+
+// ---- Biblioteca de componentes DIN (largura real em módulos, nunca pixel) ----
+// Um "módulo DIN" é a unidade lógica de largura (na prática de mercado, 17,5 mm — o valor
+// físico em mm só importa quando o motor de escala/desenho for implementado numa Sprint
+// futura; aqui o que importa é a CONTAGEM de módulos). DDR (RCBO) é um componente próprio
+// nesta biblioteca — mesma largura modular do DR equivalente, mas logicamente distinto de
+// "DR + disjuntor separados", pronto para quando o planejador decidir usá-lo.
+const COMPONENTES_DIN = {
+  disjuntor: { 1: { tipo: 'disjuntor', polos: 1, modulos: 1 }, 2: { tipo: 'disjuntor', polos: 2, modulos: 2 }, 3: { tipo: 'disjuntor', polos: 3, modulos: 3 }, 4: { tipo: 'disjuntor', polos: 4, modulos: 4 } },
+  dr: { 2: { tipo: 'dr', polos: 2, modulos: 2 }, 4: { tipo: 'dr', polos: 4, modulos: 4 } },
+  ddr: { 2: { tipo: 'ddr', polos: 2, modulos: 2 }, 4: { tipo: 'ddr', polos: 4, modulos: 4 } },
+  reserva: { tipo: 'reserva', polos: 1, modulos: 1 },
+};
+function larguraModularDisjuntor(polos) { return (COMPONENTES_DIN.disjuntor[polos] || COMPONENTES_DIN.disjuntor[1]).modulos; }
+function larguraModularDR(polos) { return (COMPONENTES_DIN.dr[polos] || COMPONENTES_DIN.dr[2]).modulos; }
+
+// ---- Catálogo de gabinetes comerciais (Sprint CORE-003) ----
+// Tamanhos comerciais REAIS de mercado (referência de produto, nunca normativa — a NBR
+// 5410 não define isso). Estrutura pronta para expansão por fabricante: hoje só existe a
+// linha "genérica" (sem marca), a única oferecida sem risco de reproduzir catálogo de
+// terceiros sem verificação real. As linhas por fabricante ficam como chaves reservadas,
+// vazias, até existir um catálogo técnico verificado — nunca preenchidas por invenção.
+const CATALOGO_GABINETES = {
+  generico: {
+    fabricante: null,
+    fonte: 'referência de mercado — tamanhos comerciais comuns de quadros de sobrepor/embutir com trilho DIN; não é uma tabela normativa da NBR 5410',
+    tamanhos: [12, 18, 24, 36, 48, 54, 72, 96],
+  },
+  schneider: { fabricante: 'Schneider', fonte: 'reservado — pendente de catálogo técnico verificado', tamanhos: [] },
+  weg: { fabricante: 'WEG', fonte: 'reservado — pendente de catálogo técnico verificado', tamanhos: [] },
+  steck: { fabricante: 'Steck', fonte: 'reservado — pendente de catálogo técnico verificado', tamanhos: [] },
+  legrand: { fabricante: 'Legrand', fonte: 'reservado — pendente de catálogo técnico verificado', tamanhos: [] },
+  tigre: { fabricante: 'Tigre', fonte: 'reservado — pendente de catálogo técnico verificado', tamanhos: [] },
+};
+
+// ---- Seleção do menor gabinete comercial compatível ----
+// Escolhe o menor tamanho da linha informada que acomode modulosNecessarios (componentes
+// reais + reserva técnica já calculada pelo planejador, CORE-002C/tabela 59). Nunca
+// arredonda "para baixo" nem inventa um tamanho fora do catálogo.
+function escolherGabineteComercial(modulosNecessarios, linha) {
+  linha = linha || 'generico';
+  const catalogo = CATALOGO_GABINETES[linha] || CATALOGO_GABINETES.generico;
+  const tamanho = catalogo.tamanhos.find((t) => t >= modulosNecessarios) ?? null;
+  return { tamanhoModulos: tamanho, fabricante: catalogo.fabricante, fonte: catalogo.fonte, linha };
+}
+
+// ---- Construção da lista de componentes físicos a partir do PanelPlan ----
+// Lê exclusivamente o que o Electrical Decision Engine já decidiu (disjuntorGeral,
+// conjuntoDPS, gruposDR, circuitosSemDR) — não recalcula nem reinterpreta nenhuma decisão
+// elétrica. Cada circuito vira exatamente um componente "disjuntor", nunca duplicado,
+// nunca perdido (mesma garantia já validada nas Sprints anteriores).
+function construirComponentesFisicos(circuitos, panelPlan) {
+  const componentes = [];
+  const porId = new Map(circuitos.map((c) => [c.id, c]));
+
+  if (panelPlan.disjuntorGeral && panelPlan.disjuntorGeral.disjuntorGeral !== null) {
+    componentes.push({
+      id: 'GERAL', tipo: 'disjuntor-geral', polos: panelPlan.disjuntorGeral.polos,
+      modulosLargura: larguraModularDisjuntor(panelPlan.disjuntorGeral.polos),
+      origemId: 'GERAL', rotulo: `Geral ${panelPlan.disjuntorGeral.disjuntorGeral}A`,
+    });
+  }
+  if (panelPlan.conjuntoDPS && panelPlan.conjuntoDPS.quantidadeModulos) {
+    componentes.push({
+      id: 'DPS', tipo: 'dps', polos: panelPlan.conjuntoDPS.quantidadePolos,
+      modulosLargura: panelPlan.conjuntoDPS.quantidadeModulos,
+      origemId: 'DPS', rotulo: 'Conjunto DPS',
+    });
+  }
+  (panelPlan.gruposDR || []).forEach((grupo) => {
+    componentes.push({
+      id: grupo.id, tipo: 'dr', polos: grupo.polos, modulosLargura: larguraModularDR(grupo.polos),
+      origemId: grupo.id, rotulo: `${grupo.id} (${grupo.nomeFuncional || 'grupo DR'})`,
+    });
+    grupo.circuitos.forEach((circuitoId) => {
+      const c = porId.get(circuitoId);
+      if (!c) return;
+      const polos = c.params.sistema === 'trifasico' ? 3 : 1;
+      componentes.push({
+        id: `C${circuitoId}`, tipo: 'disjuntor-circuito', polos, modulosLargura: larguraModularDisjuntor(polos),
+        origemId: circuitoId, rotulo: c.descricao, grupoDRId: grupo.id,
+      });
+    });
+  });
+  (panelPlan.circuitosSemDR || []).forEach((circuitoId) => {
+    const c = porId.get(circuitoId);
+    if (!c) return;
+    const polos = c.params.sistema === 'trifasico' ? 3 : 1;
+    componentes.push({
+      id: `C${circuitoId}`, tipo: 'disjuntor-circuito', polos, modulosLargura: larguraModularDisjuntor(polos),
+      origemId: circuitoId, rotulo: c.descricao, grupoDRId: null,
+    });
+  });
+  const modulosReserva = panelPlan.modulosReserva || 0;
+  for (let i = 0; i < modulosReserva; i++) {
+    componentes.push({ id: `RESERVA-${i + 1}`, tipo: 'reserva', polos: 1, modulosLargura: COMPONENTES_DIN.reserva.modulos, origemId: null, rotulo: 'Reserva' });
+  }
+  return componentes;
+}
+
+// ---- Posicionamento em trilhos (linhas/colunas em módulos DIN, sem lógica de desenho) ----
+// Cada trilho tem capacidade FIXA em módulos (mesma referência genérica já usada no
+// CORE-002C — CAPACIDADE_MODULOS_POR_TRILHO_GENERICA — reaproveitada aqui, não duplicada).
+// Ordem de posicionamento (convenção elétrica já validada nas Sprints anteriores, agora
+// formalizada como dado, não mais implícita numa função de desenho):
+//   1) Geral + DPS sempre no primeiro trilho;
+//   2) cada grupo de DR começa um trilho novo, seguido dos disjuntores que protege;
+//   3) circuitos sem DR são empacotados em trilhos até a capacidade;
+//   4) reservas por último.
+// Cada componente recebe { trilho, offsetModulos, larguraModulos } — apenas geometria
+// lógica (índice de trilho + posição em módulos), nunca coordenada de desenho (x/y em px).
+function posicionarComponentesEmTrilhos(componentes, capacidadeModulosPorTrilho) {
+  const trilhos = [];
+  let trilhoAtual = null;
+  function novoTrilho() {
+    trilhoAtual = { indice: trilhos.length, capacidadeModulos: capacidadeModulosPorTrilho, componentes: [], modulosOcupados: 0 };
+    trilhos.push(trilhoAtual);
+    return trilhoAtual;
+  }
+  function colocar(componente, forcarNovoTrilho) {
+    if (!trilhoAtual || forcarNovoTrilho || trilhoAtual.modulosOcupados + componente.modulosLargura > capacidadeModulosPorTrilho) {
+      novoTrilho();
+    }
+    const posicionado = { ...componente, trilho: trilhoAtual.indice, offsetModulos: trilhoAtual.modulosOcupados, larguraModulos: componente.modulosLargura };
+    trilhoAtual.componentes.push(posicionado);
+    trilhoAtual.modulosOcupados += componente.modulosLargura;
+    return posicionado;
+  }
+
+  const posicionados = [];
+  const geralEDps = componentes.filter((c) => c.tipo === 'disjuntor-geral' || c.tipo === 'dps');
+  const gruposDR = new Map();
+  componentes.filter((c) => c.tipo === 'dr').forEach((c) => gruposDR.set(c.id, { dr: c, circuitos: [] }));
+  componentes.filter((c) => c.tipo === 'disjuntor-circuito' && c.grupoDRId).forEach((c) => {
+    if (gruposDR.has(c.grupoDRId)) gruposDR.get(c.grupoDRId).circuitos.push(c);
+  });
+  const semDR = componentes.filter((c) => c.tipo === 'disjuntor-circuito' && !c.grupoDRId);
+  const reservas = componentes.filter((c) => c.tipo === 'reserva');
+
+  geralEDps.forEach((c, i) => posicionados.push(colocar(c, i === 0)));
+  gruposDR.forEach(({ dr, circuitos }) => {
+    posicionados.push(colocar(dr, true));
+    circuitos.forEach((c) => posicionados.push(colocar(c, false)));
+  });
+  semDR.forEach((c, i) => posicionados.push(colocar(c, i === 0 && trilhoAtual && trilhoAtual.componentes.some((x) => x.tipo === 'dr' || x.tipo === 'disjuntor-circuito'))));
+  reservas.forEach((c, i) => posicionados.push(colocar(c, i === 0)));
+
+  trilhos.forEach((t) => { t.modulosLivres = t.capacidadeModulos - t.modulosOcupados; });
+  return { trilhos, componentesPosicionados: posicionados };
+}
+
+// ---- Orquestrador: monta o PhysicalPanelLayout ----
+function planejarLayoutFisico(circuitos, panelPlan, dadosInstalacao) {
+  dadosInstalacao = dadosInstalacao || {};
+  const linhaGabinete = dadosInstalacao.linhaGabinete || 'generico';
+  const alertas = [];
+
+  const componentes = construirComponentesFisicos(circuitos, panelPlan);
+  const modulosComponentesReais = componentes.filter((c) => c.tipo !== 'reserva').reduce((s, c) => s + c.modulosLargura, 0);
+  const modulosReservaTecnica = componentes.filter((c) => c.tipo === 'reserva').reduce((s, c) => s + c.modulosLargura, 0);
+  const modulosTotaisNecessarios = modulosComponentesReais + modulosReservaTecnica;
+
+  const capacidadeModulosPorTrilho = (typeof CAPACIDADE_MODULOS_POR_TRILHO_GENERICA === 'number') ? CAPACIDADE_MODULOS_POR_TRILHO_GENERICA : 12;
+  const { trilhos, componentesPosicionados } = posicionarComponentesEmTrilhos(componentes, capacidadeModulosPorTrilho);
+
+  const gabineteSelecionado = escolherGabineteComercial(modulosTotaisNecessarios, linhaGabinete);
+  if (gabineteSelecionado.tamanhoModulos === null) {
+    alertas.push(`Nenhum gabinete da linha "${linhaGabinete}" comporta ${modulosTotaisNecessarios} módulos — maior tamanho disponível nesta linha é insuficiente. Revisão obrigatória do responsável técnico (dividir em mais de um quadro físico ou trocar de linha de gabinete).`);
+  }
+
+  return {
+    id: 'PHYSICAL-LAYOUT-QDG',
+    componentes: componentesPosicionados,
+    trilhos,
+    numeroTrilhos: trilhos.length,
+    capacidadeModulosPorTrilho,
+    modulosComponentesReais,
+    modulosReservaTecnica,
+    modulosTotaisNecessarios,
+    gabineteSelecionado,
+    alertas,
+  };
+}
+
+/* ============ ENGINE-001 — INTEGRAÇÃO DEFINITIVA (CORE-002 → CORE-003 → Render/BOM/PDF) ============
+   ProjetoEletricoFinal é o único objeto que carrega TODAS as decisões já tomadas para um
+   quadro (geral ou sub-quadro). É pura composição de planejarQuadro() (CORE-002/CORE-002C)
+   + planejarLayoutFisico() (CORE-003) — nenhuma decisão elétrica nova é tomada aqui.
+   gerarSVGQuadro()/gerarBOMConsolidada() passam a consumir exclusivamente este objeto,
+   nunca mais recalculando disjuntor geral, DPS ou agrupamento de DR por conta própria. */
+function montarProjetoEletricoFinal(circuitos, tipoEntrada, perfil, dadosInstalacao) {
+  const panelPlan = planejarQuadro(circuitos, tipoEntrada, perfil, dadosInstalacao);
+  const layoutFisico = planejarLayoutFisico(circuitos, panelPlan, dadosInstalacao);
+  return { ...panelPlan, layoutFisico, circuitos };
+}
+
+// ---- Visualização temporária de auditoria do layout físico (tabelas — sem desenho) ----
+function renderizarAuditoriaLayoutFisico(layout) {
+  const tabelaResumo = `
+    <table class="bom-table"><tbody>
+      <tr><td>Módulos de componentes reais</td><td>${layout.modulosComponentesReais}</td></tr>
+      <tr><td>Módulos de reserva técnica</td><td>${layout.modulosReservaTecnica}</td></tr>
+      <tr><td>Módulos totais necessários</td><td>${layout.modulosTotaisNecessarios}</td></tr>
+      <tr><td>Número de trilhos</td><td>${layout.numeroTrilhos} (capacidade ${layout.capacidadeModulosPorTrilho} módulos/trilho cada)</td></tr>
+      <tr><td>Gabinete comercial selecionado</td><td>${layout.gabineteSelecionado.tamanhoModulos ?? '— (nenhum gabinete comporta)'} módulos — linha "${layout.gabineteSelecionado.linha}"${layout.gabineteSelecionado.fabricante ? ' — ' + escaparXML(layout.gabineteSelecionado.fabricante) : ''}</td></tr>
+    </tbody></table>`;
+
+  const tabelaTrilhos = layout.trilhos.map((t) => `
+    <div class="bom-group-title" style="font-size:12px;">Trilho ${t.indice + 1} — ${t.modulosOcupados}/${t.capacidadeModulos} módulos ocupados (${t.modulosLivres} livres)</div>
+    <table class="bom-table"><thead><tr><th>Offset (módulos)</th><th>Componente</th><th>Tipo</th><th>Polos</th><th>Largura (módulos)</th></tr></thead><tbody>
+      ${t.componentes.map((c) => `<tr><td>${c.offsetModulos}</td><td>${escaparXML(c.rotulo)}</td><td>${escaparXML(c.tipo)}</td><td>${c.polos}</td><td>${c.larguraModulos}</td></tr>`).join('')}
+    </tbody></table>`).join('');
+
+  const alertasHTML = layout.alertas.length ? `<ul>${layout.alertas.map((a) => `<li>${escaparXML(a)}</li>`).join('')}</ul>` : '<p class="field-hint">Nenhum alerta.</p>';
+
+  return `
+    <div class="panel" style="border: 2px dashed var(--blue); margin-bottom: 22px;">
+      <div class="section-title"><h2>Motor de Arquitetura Física (Beta — Sprint CORE-003)</h2></div>
+      <div class="field-hint" style="margin-bottom:14px;">Estrutura física do quadro em memória — geometria lógica (módulos/trilhos/gabinete), sem nenhum desenho. O SVG atual continua exatamente como estava.</div>
+      <div class="bom-group-title">Resumo</div>
+      ${tabelaResumo}
+      <div class="bom-group-title">Ocupação por trilho</div>
+      ${tabelaTrilhos}
+      <div class="bom-group-title">Alertas</div>
+      ${alertasHTML}
+    </div>
+  `;
 }
 
 function truncarTexto(str, n) {
@@ -2801,15 +3982,19 @@ function svgGabinete(x, y, w, h, opts) {
   return s;
 }
 
-function gerarSVGQuadro(circuitos, tipoEntrada) {
-  tipoEntrada = FASES_POR_ENTRADA[tipoEntrada] ? tipoEntrada : 'monofasica';
-  const semDR = circuitos.filter((c) => !c.exigeDR);
-  const comDR = circuitos.filter((c) => c.exigeDR);
-  const gruposDR = agruparPorDR(comDR, 4);
+// gerarSVGQuadro() é um RENDERIZADOR PURO desde a Sprint ENGINE-001: recebe um
+// ProjetoEletricoFinal já com todas as decisões elétricas tomadas (disjuntor geral, DPS,
+// agrupamento de DR) por planejarQuadro()/planejarLayoutFisico() — nunca recalcula nada
+// disso por conta própria. As funções svg*() de desenho abaixo permanecem intocadas.
+function gerarSVGQuadro(projeto) {
+  const circuitos = projeto.circuitos;
+  const tipoEntrada = FASES_POR_ENTRADA[projeto.tipoEntrada] ? projeto.tipoEntrada : 'monofasica';
+  const porId = new Map(circuitos.map((c) => [c.id, c]));
+  const gruposDR = projeto.gruposDR;
+  const circuitosSemDR = projeto.circuitosSemDR.map((id) => porId.get(id)).filter(Boolean);
 
-  const somaIbGeral = circuitos.reduce((s, c) => s + c.resultado.ib, 0);
-  const disjuntorGeral = escolherDisjuntor(somaIbGeral, Infinity);
-  const geralPolos = POLOS_GERAL_POR_ENTRADA[tipoEntrada];
+  const disjuntorGeral = projeto.disjuntorGeral.disjuntorGeral;
+  const geralPolos = projeto.disjuntorGeral.polos;
   const fases = FASES_POR_ENTRADA[tipoEntrada];
   const rotuloGeral = { monofasica: 'GERAL MONO', bifasica: 'GERAL BI', trifasica: 'GERAL TRI' }[tipoEntrada];
 
@@ -2825,16 +4010,18 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
   rows.push({
     devices: [
       { kind: 'geral', mods: geralPolos >= 4 ? 4 : 2, l1: `${disjuntorGeral !== null ? disjuntorGeral : '>' + DISJUNTORES[DISJUNTORES.length - 1]}A`, l2: rotuloGeral },
-      { kind: 'dps', mods: 2, l1: 'DPS', l2: 'CLASSE II' },
+      // Largura do DPS passa a vir de projeto.conjuntoDPS (CORE-002) — 4 módulos em entrada
+      // trifásica, 2 nos demais casos (Sprint ENGINE-001, correção aprovada explicitamente:
+      // o desenho estava sempre fixo em 2 módulos, desalinhado do que o CORE-002 já calculava).
+      { kind: 'dps', mods: projeto.conjuntoDPS.quantidadeModulos || 2, l1: 'DPS', l2: 'CLASSE II' },
     ],
   });
 
   gruposDR.forEach((grupo, gi) => {
-    const somaIbGrupo = grupo.reduce((s, c) => s + c.resultado.ib, 0);
-    const idrPolos = grupo.some((c) => c.params.sistema === 'trifasico') ? 4 : 2;
-    const idr = escolherIDR(somaIbGrupo);
-    const devices = [{ kind: 'idr', mods: idrPolos, l1: `${idr !== null ? idr : '>' + DR_RATINGS[DR_RATINGS.length - 1]}A`, l2: `IDR-${gi + 1} 30mA` }];
-    grupo.forEach((c) => {
+    const devices = [{ kind: 'idr', mods: grupo.polos, l1: `${grupo.correnteNominal !== null ? grupo.correnteNominal : '>' + DR_RATINGS[DR_RATINGS.length - 1]}A`, l2: `IDR-${gi + 1} 30mA` }];
+    grupo.circuitos.forEach((circuitoId) => {
+      const c = porId.get(circuitoId);
+      if (!c) return;
       const polos = c.params.sistema === 'trifasico' ? 3 : 1;
       devices.push({ kind: 'breaker', mods: polos, l1: `${c.resultado.inom}A`, l2: `C${numeroPorId.get(c.id)}`, titulo: c.descricao, conforme: c.resultado.conforme });
     });
@@ -2842,7 +4029,7 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
   });
 
   let atual = [], atualMods = 0;
-  semDR.forEach((c) => {
+  circuitosSemDR.forEach((c) => {
     const polos = c.params.sistema === 'trifasico' ? 3 : 1;
     if (atualMods + polos > ROW_CAP && atual.length) { rows.push({ devices: atual }); atual = []; atualMods = 0; }
     atual.push({ kind: 'breaker', mods: polos, l1: `${c.resultado.inom}A`, l2: `C${numeroPorId.get(c.id)}`, titulo: c.descricao, conforme: c.resultado.conforme });
@@ -2945,14 +4132,20 @@ function gerarSVGQuadro(circuitos, tipoEntrada) {
     return { svg, titulo: tituloBloco, modulos: modulosBloco };
   });
 
-  return { blocos, totalBlocos, disjuntorGeral, geralPolos, somaIbGeral, tipoEntrada };
+  return { blocos, totalBlocos, disjuntorGeral, geralPolos, somaIbGeral: projeto.demanda.correnteInstaladaEquivalenteA, tipoEntrada };
 }
 
 function escaparXML(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function gerarBOMConsolidada(circuitos, meta) {
+// gerarBOMConsolidada() consome exclusivamente o ProjetoEletricoFinal desde a Sprint
+// ENGINE-001 — não recalcula mais agrupamento de DR nem disjuntor geral por conta própria.
+// O tamanho de gabinete exibido aqui continua com o mesmo cálculo de sempre (sem reserva da
+// Tabela 59), deliberadamente não trocado por projeto.capacidadeGabinete nesta Sprint —
+// ver plano ENGINE-001, divergência 2 (mudaria o número exibido, fora do escopo aprovado).
+function gerarBOMConsolidada(projeto) {
+  const circuitos = projeto.circuitos;
   const fase = new Map();
   const terra = new Map();
   const disjuntores = new Map();
@@ -2976,17 +4169,10 @@ function gerarBOMConsolidada(circuitos, meta) {
     }
   });
 
-  const comDR = circuitos.filter((c) => c.exigeDR);
-  const gruposDR = agruparPorDR(comDR, 4);
-  const idrItens = gruposDR.map((grupo, gi) => {
-    const somaIb = grupo.reduce((s, c) => s + c.resultado.ib, 0);
-    const idr = escolherIDR(somaIb);
-    const polos = grupo.some((c) => c.params.sistema === 'trifasico') ? 4 : 2;
-    return { idr, polos, n: grupo.length };
-  });
+  const idrItens = projeto.gruposDR.map((grupo) => ({ idr: grupo.correnteNominal, polos: grupo.polos, n: grupo.circuitos.length }));
 
-  const modulosGeral = meta.geralPolos;
-  const modulosDPS = meta.geralPolos >= 4 ? 4 : 2;
+  const modulosGeral = projeto.disjuntorGeral.polos;
+  const modulosDPS = projeto.conjuntoDPS.quantidadeModulos || 2;
   const modulosIDR = idrItens.reduce((s, i) => s + i.polos, 0);
   const totalModulos = modulosGeral + modulosDPS + modulosIDR + totalModulosCircuitos;
   const quadroTamanho = escolherQuadro(totalModulos);
@@ -3009,7 +4195,7 @@ function gerarBOMConsolidada(circuitos, meta) {
     return { desc: `Disjuntor termomagnético ${tipoPolo} ${inom} A`, qtd: n, un: 'un' };
   });
   const grupoProtecao = [
-    { desc: `Disjuntor geral ${meta.geralPolos >= 4 ? 'tetrapolar' : 'bipolar'} ${meta.disjuntorGeral ?? '—'} A`, qtd: 1, un: 'un' },
+    { desc: `Disjuntor geral ${modulosGeral >= 4 ? 'tetrapolar' : 'bipolar'} ${projeto.disjuntorGeral.disjuntorGeral ?? '—'} A`, qtd: 1, un: 'un' },
     { desc: 'DPS Classe II', qtd: 1, un: 'un' },
     ...idrItens.map((i) => ({ desc: `IDR/DR 30mA ${i.polos >= 4 ? 'tetrapolar' : 'bipolar'} ${i.idr ?? '—'} A (protege ${i.n} circuito${i.n === 1 ? '' : 's'})`, qtd: 1, un: 'un' })),
   ];
@@ -3182,9 +4368,13 @@ function detectarSubQuadros(lista) {
   return grupos;
 }
 
-function subQuadroHTML(titulo, lista, tipoEntrada, idSufixo) {
-  const { blocos, disjuntorGeral, geralPolos } = gerarSVGQuadro(lista, tipoEntrada, idSufixo);
-  const bom = gerarBOMConsolidada(lista, { disjuntorGeral, geralPolos });
+// Cada sub-quadro monta seu PRÓPRIO ProjetoEletricoFinal (Sprint ENGINE-001) — é tratado
+// como uma instalação independente, com seu próprio CORE-002+CORE-003 completo, exatamente
+// como já acontecia antes desta Sprint (só que agora sem recalcular disjuntor/DR "soltos").
+function subQuadroHTML(titulo, lista, tipoEntrada, perfil, dadosInstalacao) {
+  const projetoSub = montarProjetoEletricoFinal(lista, tipoEntrada, perfil, dadosInstalacao);
+  const { blocos, disjuntorGeral, geralPolos } = gerarSVGQuadro(projetoSub);
+  const bom = gerarBOMConsolidada(projetoSub);
   const diagramaHTML = blocos.map((b) => `<div class="diagrama-container">${b.svg}</div>`).join('');
   const avisoDivisao = blocos.length > 1
     ? `<div class="field-hint" style="margin-bottom:8px;">Este sub-quadro foi dividido em ${blocos.length} blocos ilustrativos para fins de documentação técnica — a divisão física real deve ser validada no projeto executivo.</div>`
@@ -3204,12 +4394,20 @@ function subQuadroHTML(titulo, lista, tipoEntrada, idSufixo) {
   `;
 }
 
+// Handler único (Sprint ENGINE-001 — antes eram 3 listeners separados: desenho+BOM, avanço
+// do wizard, auditoria do CORE-002C). Agora existe UMA única montagem de ProjetoEletricoFinal
+// por clique, reaproveitada por desenho, BOM, sub-quadros e painel de auditoria — nenhum
+// deles recalcula nada por conta própria.
 $('#btn-gerar-quadro').addEventListener('click', () => {
   if (circuitos.length === 0) return;
   const projetoAtual = lerProjeto();
   const tipoEntrada = projetoAtual.identificacao.tipoEntrada;
-  const { blocos, disjuntorGeral, geralPolos, somaIbGeral } = gerarSVGQuadro(circuitos, tipoEntrada, 'geral');
-  const bom = gerarBOMConsolidada(circuitos, { disjuntorGeral, geralPolos });
+  const perfil = projetoAtual.perfil;
+
+  const projeto = montarProjetoEletricoFinal(circuitos, tipoEntrada, perfil, {});
+
+  const { blocos, disjuntorGeral, geralPolos } = gerarSVGQuadro(projeto);
+  const bom = gerarBOMConsolidada(projeto);
   const legendaQuadro = `<div class="field-hint" style="margin-bottom:8px;">Quadro — ${LABEL_PERFIL[projetoAtual.perfil] || 'Residencial'} · Entrada ${LABEL_TIPO_ENTRADA[tipoEntrada]} · Disjuntor geral ${geralPolos >= 4 ? 'tetrapolar' : 'bipolar'} ${disjuntorGeral ?? '—'} A · o número em cada disjuntor (C1, C2…) corresponde à linha "Nº" da tabela de detalhamento técnico logo abaixo</div>`;
   const diagramaHTML = blocos.map((b) => `<div class="diagrama-container">${b.svg}</div>`).join('');
   const avisoDivisaoBlocos = blocos.length > 1
@@ -3225,7 +4423,7 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
     : `<div class="veredito-geral fail"><div class="icon-circle">${iconX()}</div><div><h3>${naoConformes.length} DE ${circuitos.length} CIRCUITOS FORA DA NORMA</h3><p>Revisar: ${naoConformes.map((c) => escaparXML(c.descricao)).join(', ')}.</p></div></div>`;
 
   const subQuadros = detectarSubQuadros(circuitos);
-  const subQuadrosHTML = subQuadros.map((g) => subQuadroHTML(g.titulo, g.circuitos, tipoEntrada, g.id)).join('');
+  const subQuadrosHTML = subQuadros.map((g) => subQuadroHTML(g.titulo, g.circuitos, tipoEntrada, perfil, {})).join('');
 
   $('#quadro-conteudo').innerHTML = `
     ${printHeaderHTML()}
@@ -3279,6 +4477,18 @@ $('#btn-gerar-quadro').addEventListener('click', () => {
   $('#btn-gerar-quadro').classList.remove('btn-orange');
   $('#btn-gerar-quadro').classList.add('btn-outline');
   salvarProjeto();
+
+  // Avanço do wizard para a etapa "Resultado" — antes era um listener separado que checava
+  // display==='block'; nesta função unificada essa condição já é sempre verdadeira neste
+  // ponto (display acabou de ser setado acima), então a chamada é direta, sem mudança de
+  // comportamento.
+  irParaEtapaWizard(6);
+
+  // Painel de auditoria do planejador (CORE-002C) — reaproveita o MESMO `projeto` já
+  // montado no topo deste handler, sem recalcular nada (antes era um 3º listener separado
+  // que rodava planejarQuadro() de novo, de forma redundante).
+  const containerAuditoria = $('#auditoria-planejador-container');
+  if (containerAuditoria) containerAuditoria.innerHTML = renderizarAuditoriaPlano(projeto);
 });
 
 /* ============ INIT ============ */
